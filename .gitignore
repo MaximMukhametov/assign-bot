@@ -1,0 +1,8 @@
+*.env*
+!*.env.example
+.idea
+.cache
+.pytest_cache
+__pycache__/
+*.pyo
+*.pyc

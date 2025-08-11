@@ -5,39 +5,13 @@ import logging
 import os
 from typing import NoReturn
 
-from aiogram import Bot, Dispatcher, F, Router
-from aiogram.exceptions import TelegramAPIError
-from aiogram.filters import CommandStart
-from aiogram.types import Message
+from aiogram import Bot, Dispatcher
+from src.assign_bot import router
 
 
 logger = logging.getLogger(__name__)
 
 
-router = Router(name="echo_router")
-
-
-@router.message(CommandStart())
-async def handle_start(message: Message) -> None:
-    try:
-        await message.answer("Привет! Отправь мне любой текст, и я повторю его обратно.")
-    except TelegramAPIError as exc:  # network/api issues
-        logger.exception("Не удалось отправить приветственное сообщение: %s", exc)
-
-
-@router.message(F.text)
-async def handle_echo(message: Message) -> None:
-    text: str = message.text or ""
-    try:
-        await message.answer(text)
-    except TelegramAPIError as exc:
-        logger.exception("Ошибка при отправке сообщения пользователю: %s", exc)
-        # Пытаемся уведомить пользователя кратко, если возможно
-        try:
-            await message.answer("Не удалось отправить сообщение. Попробуйте ещё раз позже.")
-        except TelegramAPIError:
-            # глушим вторичную ошибку отправки
-            pass
 
 
 async def run_bot() -> None:

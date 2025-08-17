@@ -21,15 +21,16 @@ import pytest
 def clean_state():
     """
     Автоматическая очистка состояния между тестами.
-    
+
     Очищает глобальное состояние бота для изоляции тестов.
     """
     # Очищаем состояние перед тестом
     yield
-    
+
     # Очищаем состояние после теста
     try:
         from assign_bot.bot import CHAT_STATE, PENDING, EXPECT_CONFIG
+
         CHAT_STATE.clear()
         PENDING.clear()
         EXPECT_CONFIG.clear()

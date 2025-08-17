@@ -5,5 +5,3 @@ __all__ = [
 ]
 
 from .bot import router  # noqa: E402  (import after __all__)
-
-

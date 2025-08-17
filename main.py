@@ -12,17 +12,15 @@ from src.assign_bot import router
 logger = logging.getLogger(__name__)
 
 
-
-
 async def run_bot() -> None:
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
     )
 
-    token: str | None = os.environ.get("TELEGRAM_TOKEN")
+    token: str | None = os.environ.get("BOT_TOKEN")
     if not token:
-        logger.error("Переменная окружения TELEGRAM_TOKEN не установлена")
+        logger.error("Переменная окружения BOT_TOKEN не установлена")
         return
 
     bot: Bot | None = None

@@ -95,9 +95,9 @@ class TestSelectAssignees:
         
         result = _select_assignees(SelectionPolicy.ROUND_ROBIN, active, mock_state)
         
-        # Round-robin всегда выбирает 1 человека
-        assert len(result) == 1
-        assert result[0] in active
+        # Round-robin для команды >= 2 выбирает 2 человек
+        assert len(result) == 2
+        assert all(user in active for user in result)
         assert mock_state.selector.policy == SelectionPolicy.ROUND_ROBIN
     
     def test_select_assignees_round_robin_sequence(self, mock_state):
@@ -105,12 +105,13 @@ class TestSelectAssignees:
         active = ["@alice", "@bob", "@charlie"]
         
         results = []
-        for _ in range(6):  # 2 полных цикла
+        for _ in range(3):  # 3 выбора
             result = _select_assignees(SelectionPolicy.ROUND_ROBIN, active, mock_state)
             results.extend(result)
         
-        # Проверяем цикличность (может быть в любом порядке, но должен быть цикл)
+        # Каждый выбор возвращает 2 участника, итого 6 результатов
         assert len(results) == 6
+        # Проверяем, что используются все участники (не обязательно равномерно)
         assert len(set(results)) == 3  # Все 3 пользователя должны быть выбраны
     
     def test_select_assignees_with_invalid_active_users(self, mock_state):
@@ -210,7 +211,7 @@ class TestIntegrationFlows:
             assignments.extend(assigned)
         
         # Проверяем результаты
-        assert len(assignments) == 4
+        assert len(assignments) == 8  # 4 назначения по 2 человека = 8
         assert all(user in active_users for user in assignments)
         # Должна быть цикличность между @alice и @charlie
         unique_assigned = set(assignments)
@@ -251,7 +252,7 @@ class TestIntegrationFlows:
         
         # Начинаем с round-robin
         rr_result = _select_assignees(SelectionPolicy.ROUND_ROBIN, active, state)
-        assert len(rr_result) == 1
+        assert len(rr_result) == 2  # Для 2 активных выберет 2
         
         # Переключаемся на random
         random_result = _select_assignees(SelectionPolicy.RANDOM, active, state)
@@ -259,7 +260,7 @@ class TestIntegrationFlows:
         
         # Возвращаемся к round-robin (состояние должно сброситься)
         rr_result2 = _select_assignees(SelectionPolicy.ROUND_ROBIN, active, state)
-        assert len(rr_result2) == 1
+        assert len(rr_result2) == 2  # Для 2 активных выберет 2
 
 
 class TestRealWorldScenarios:

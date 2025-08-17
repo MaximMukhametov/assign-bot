@@ -16,81 +16,178 @@ from assign_bot.selector import (
 )
 
 
-class TestSelectionStrategies:
-    """Тесты для стратегий выбора."""
+class TestRandomStrategy:
+    """Тесты для стратегии случайного выбора."""
     
-    def test_random_strategy_empty_collection(self):
+    def test_empty_collection(self):
         """Тест случайной стратегии с пустой коллекцией."""
         strategy = RandomStrategy[str]()
-        selected, state = strategy.select([], count=3)
+        selected = strategy.select([], count=3)
         
         assert selected == []
-        assert state is None
     
-    def test_random_strategy_normal_selection(self):
+    def test_normal_selection(self):
         """Тест случайной стратегии с обычным выбором."""
         strategy = RandomStrategy[str]()
         available = ["a", "b", "c", "d", "e"]
         
-        selected, state = strategy.select(available, count=3)
+        selected = strategy.select(available, count=3)
         
         assert len(selected) == 3
         assert all(item in available for item in selected)
         assert len(set(selected)) == 3  # Без повторений
-        assert state is None  # Random не использует состояние
     
-    def test_random_strategy_count_exceeds_available(self):
+    def test_count_exceeds_available(self):
         """Тест случайной стратегии когда запрашивается больше элементов, чем доступно."""
         strategy = RandomStrategy[str]()
         available = ["a", "b"]
         
-        selected, state = strategy.select(available, count=5)
+        selected = strategy.select(available, count=5)
         
         assert len(selected) == 2  # Максимум доступных
         assert set(selected) == {"a", "b"}
     
-    def test_round_robin_strategy_empty_collection(self):
-        """Тест round-robin стратегии с пустой коллекцией."""
-        strategy = RoundRobinStrategy[str]()
-        selected, state = strategy.select([], count=1)
-        
-        assert selected == []
-        assert state is None
-    
-    def test_round_robin_strategy_initial_state(self):
-        """Тест round-robin стратегии с начальным состоянием."""
-        strategy = RoundRobinStrategy[str]()
+    def test_state_independence(self):
+        """Тест что random стратегия не зависит от состояния и reset ничего не ломает."""
+        strategy = RandomStrategy[str]()
         available = ["a", "b", "c"]
         
-        selected, state = strategy.select(available, count=1, state=None)
+        # Выполняем несколько выборов
+        selected1 = strategy.select(available, count=2)
+        strategy.reset()  # Не должно влиять на следующие выборы
+        selected2 = strategy.select(available, count=2)
+        strategy.reset()
+        selected3 = strategy.select(available, count=2)
+        
+        # Все выборы корректны
+        for selected in [selected1, selected2, selected3]:
+            assert len(selected) == 2
+            assert all(item in available for item in selected)
+
+
+class TestRoundRobinStrategy:
+    """Тесты для стратегии round-robin выбора."""
+    
+    def test_empty_collection(self):
+        """Тест round-robin стратегии с пустой коллекцией."""
+        strategy = RoundRobinStrategy[str]()
+        selected = strategy.select([], count=1)
+        
+        assert selected == []
+    
+    def test_initial_state(self):
+        """Тест round-robin стратегии с начальным состоянием."""
+        strategy = RoundRobinStrategy[str]()
+        full_collection = ["a", "b", "c"]
+        available = ["a", "b", "c"]
+        
+        selected = strategy.select(available, count=1, full_collection=full_collection)
         
         assert len(selected) == 1
         assert selected[0] in available
-        assert state == 0  # Индекс первого элемента
+        assert selected == ["a"]  # Первый элемент коллекции
     
-    def test_round_robin_strategy_sequential_selections(self):
+    def test_sequential_selections(self):
         """Тест последовательных выборов round-robin."""
         strategy = RoundRobinStrategy[str]()
+        full_collection = ["a", "b", "c"]
         available = ["a", "b", "c"]
         
-        state = None
         selections = []
         
         for _ in range(6):  # 2 полных цикла
-            selected, state = strategy.select(available, count=1, state=state)
+            selected = strategy.select(available, count=1, full_collection=full_collection)
             selections.extend(selected)
         
         # Проверяем цикличность
         assert selections == ["a", "b", "c", "a", "b", "c"]
     
-    def test_round_robin_strategy_multiple_count(self):
-        """Тест round-robin с запросом нескольких элементов (должен возвращать только 1)."""
+    def test_multiple_count(self):
+        """Тест round-robin с запросом нескольких элементов."""
+        strategy = RoundRobinStrategy[str]()
+        full_collection = ["a", "b", "c"]
+        available = ["a", "b", "c"]
+        
+        selected = strategy.select(available, count=3, full_collection=full_collection)
+        
+        assert len(selected) == 3  # Round-robin возвращает запрошенное количество
+        assert selected == ["a", "b", "c"]  # Последовательный выбор
+        
+    def test_partial_count(self):
+        """Тест round-robin с запросом части элементов."""
+        strategy = RoundRobinStrategy[str]()
+        full_collection = ["a", "b", "c", "d"]
+        available = ["a", "b", "c", "d"]
+        
+        selected = strategy.select(available, count=2, full_collection=full_collection)
+        
+        assert len(selected) == 2
+        assert selected == ["a", "b"]  # Первые два элемента
+    
+    def test_partial_available_selection(self):
+        """Тест round-robin с частично доступными элементами."""
+        strategy = RoundRobinStrategy[str]()
+        full_collection = ["a", "b", "c", "d", "e"]
+        available = ["a", "c", "e"]  # Пропускаем b и d
+        
+        selections = []
+        
+        # Делаем несколько выборов
+        for _ in range(6):
+            selected = strategy.select(available, count=1, full_collection=full_collection)
+            selections.extend(selected)
+        
+        # Должны получить цикл только из доступных элементов
+        assert len(selections) == 6
+        assert all(item in available for item in selections)
+        # Проверяем, что все доступные элементы были выбраны
+        assert set(selections) == set(available)
+    
+    def test_requires_full_collection(self):
+        """Тест что round-robin требует full_collection."""
         strategy = RoundRobinStrategy[str]()
         available = ["a", "b", "c"]
         
-        selected, state = strategy.select(available, count=3, state=None)
+        with pytest.raises(ValueError, match="full_collection обязательна"):
+            strategy.select(available, count=1)
+    
+    def test_state_persistence_with_partial_available(self):
+        """Тест сохранения состояния при работе с частичными списками."""
+        strategy = RoundRobinStrategy[str]()
+        full_collection = ["alice", "bob", "charlie", "david"]
         
-        assert len(selected) == 1  # Round-robin всегда возвращает 1 элемент
+        # Первый выбор: все доступны
+        available1 = ["alice", "bob", "charlie", "david"]
+        selected1 = strategy.select(available1, count=1, full_collection=full_collection)
+        assert selected1 == ["alice"]
+        
+        # Второй выбор: bob недоступен
+        available2 = ["alice", "charlie", "david"]
+        selected2 = strategy.select(available2, count=1, full_collection=full_collection)
+        # Должен перейти к charlie (пропустив bob)
+        assert selected2 == ["charlie"]
+        
+        # Третий выбор: все снова доступны
+        available3 = ["alice", "bob", "charlie", "david"]
+        selected3 = strategy.select(available3, count=1, full_collection=full_collection)
+        # Должен выбрать david (следующий после charlie)
+        assert selected3 == ["david"]
+        
+    def test_reset_state(self):
+        """Тест сброса состояния стратегии."""
+        strategy = RoundRobinStrategy[str]()
+        full_collection = ["a", "b", "c"]
+        available = ["a", "b", "c"]
+        
+        # Делаем несколько выборов
+        assert strategy.select(available, count=1, full_collection=full_collection) == ["a"]
+        assert strategy.select(available, count=1, full_collection=full_collection) == ["b"]
+        
+        # Сбрасываем состояние
+        strategy.reset()
+        
+        # Должен начать сначала
+        assert strategy.select(available, count=1, full_collection=full_collection) == ["a"]
 
 
 class TestItemSelector:
@@ -107,7 +204,6 @@ class TestItemSelector:
         
         assert selector.collection == []
         assert selector.policy == SelectionPolicy.RANDOM
-        assert selector.state is None
     
     def test_selector_set_collection(self, sample_users):
         """Тест установки коллекции."""
@@ -115,30 +211,38 @@ class TestItemSelector:
         selector.set_collection(sample_users)
         
         assert selector.collection == sample_users
-        assert selector.state is None  # Состояние сбрасывается
     
     def test_selector_set_policy(self):
         """Тест изменения политики."""
         selector = ItemSelector[str]()
-        original_state = "some_state"
-        selector.state = original_state
+        selector.set_collection(["a", "b", "c"])
         
+        # Сначала Random
+        assert selector.policy == SelectionPolicy.RANDOM
+        
+        # Меняем на RoundRobin  
         selector.set_policy(SelectionPolicy.ROUND_ROBIN)
-        
         assert selector.policy == SelectionPolicy.ROUND_ROBIN
-        assert selector.state is None  # Состояние сбрасывается при смене политики
+        
+        # Проверяем что новая стратегия работает
+        result1 = selector.select(count=1)
+        result2 = selector.select(count=1)
+        assert result1 != result2  # Round-robin даёт разные результаты
     
     def test_selector_set_same_policy(self):
-        """Тест установки той же политики (не должно сбрасывать состояние)."""
+        """Тест установки той же политики (оптимизация - не пересоздаём стратегию)."""
         selector = ItemSelector[str]()
-        selector.policy = SelectionPolicy.RANDOM
-        original_state = "some_state"
-        selector.state = original_state
+        selector.set_collection(["a", "b", "c"])
         
+        # Запоминаем текущую стратегию
+        original_strategy = selector._strategy
+        
+        # Устанавливаем ту же политику
         selector.set_policy(SelectionPolicy.RANDOM)
         
+        # Политика не изменилась, стратегия тоже не должна пересоздаваться
         assert selector.policy == SelectionPolicy.RANDOM
-        assert selector.state == original_state  # Состояние НЕ сбрасывается
+        assert selector._strategy is original_strategy  # Та же самая стратегия
     
     def test_selector_random_selection(self, sample_users):
         """Тест случайного выбора через селектор."""
@@ -211,13 +315,16 @@ class TestItemSelector:
         selector.set_collection(sample_users)
         selector.set_policy(SelectionPolicy.ROUND_ROBIN)
         
-        # Делаем выбор, чтобы установить состояние
-        selector.select(count=1)
-        assert selector.state is not None
+        # Делаем выборы - проверяем что reset работает
+        result1 = selector.select(count=1)
+        result2 = selector.select(count=1)
         
         # Сбрасываем состояние
         selector.reset_state()
-        assert selector.state is None
+        
+        # После сброса должен начать сначала
+        result3 = selector.select(count=1)
+        assert result3 == result1  # Начинает сначала
     
     def test_selector_get_info(self, sample_users):
         """Тест получения информации о селекторе."""
@@ -229,7 +336,7 @@ class TestItemSelector:
         
         assert info["collection_size"] == len(sample_users)
         assert info["policy"] == SelectionPolicy.ROUND_ROBIN.value
-        assert "state" in info
+        assert len(info) == 2  # Только размер коллекции и политика
     
     def test_selector_unsupported_policy(self):
         """Тест неподдерживаемой политики."""
@@ -304,22 +411,17 @@ class TestIntegrationScenarios:
         mock_sample.assert_called_once_with(["@alice", "@bob", "@charlie"], k=2)
 
 
-@pytest.mark.parametrize("policy,expected_count", [
-    (SelectionPolicy.RANDOM, 2),
-    (SelectionPolicy.ROUND_ROBIN, 1),
+@pytest.mark.parametrize("policy,count,expected_count", [
+    (SelectionPolicy.RANDOM, 2, 2),
+    (SelectionPolicy.ROUND_ROBIN, 3, 3),
+    (SelectionPolicy.ROUND_ROBIN, 2, 2),
 ])
-def test_policy_specific_behavior(policy, expected_count):
+def test_policy_specific_behavior(policy, count, expected_count):
     """Параметризованный тест поведения разных политик."""
     users = ["@user1", "@user2", "@user3", "@user4"]
     selector = ItemSelector[str]()
     selector.set_collection(users)
     selector.set_policy(policy)
     
-    if policy == SelectionPolicy.RANDOM:
-        # Для random запрашиваем 2, ожидаем 2
-        selected = selector.select(count=2)
-        assert len(selected) == expected_count
-    else:
-        # Для round-robin запрашиваем 3, ожидаем 1
-        selected = selector.select(count=3)
-        assert len(selected) == expected_count
+    selected = selector.select(count=count)
+    assert len(selected) == expected_count

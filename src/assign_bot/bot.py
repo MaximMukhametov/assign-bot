@@ -456,8 +456,8 @@ def _select_assignees(policy: SelectionPolicy, active: Sequence[str], state: Use
         # Для random выбираем 1-2 участника в зависимости от размера команды
         count = 2 if len(active) >= 2 else 1
     else:
-        # Для round-robin всегда выбираем 1 участника
-        count = 1
+        # Для round-robin тоже выбираем 1-2 участника в зависимости от размера команды
+        count = 2 if len(active) >= 2 else 1
     
     try:
         selected = state.selector.select_from_available(active, count)

@@ -26,78 +26,141 @@ class SelectionStrategy(ABC, Generic[T]):
     """Абстрактная стратегия выбора элементов."""
     
     @abstractmethod
-    def select(self, available: Sequence[T], count: int, state: Any = None) -> tuple[List[T], Any]:
+    def select(self, available: Sequence[T], count: int, **kwargs) -> List[T]:
         """
         Выбирает элементы из доступных.
         
         Args:
             available: Доступные для выбора элементы
             count: Количество элементов для выбора
-            state: Текущее состояние стратегии (для round-robin и т.д.)
-            
+            **kwargs: Дополнительные параметры для стратегии
+        
         Returns:
-            Tuple из выбранных элементов и нового состояния
+            Список выбранных элементов
         """
+        pass
+    
+    @abstractmethod 
+    def reset(self) -> None:
+        """Сбрасывает внутреннее состояние стратегии."""
         pass
 
 
 class RandomStrategy(SelectionStrategy[T]):
     """Стратегия случайного выбора."""
     
-    def select(self, available: Sequence[T], count: int, state: Any = None) -> tuple[List[T], Any]:
+    def select(self, available: Sequence[T], count: int, **kwargs) -> List[T]:
         """Выбирает случайные элементы без повторений."""
         if not available:
-            return [], state
+            return []
         
         actual_count = min(count, len(available))
         selected = random.sample(list(available), k=actual_count)
-        return selected, state
+        return selected
+    
+    def reset(self) -> None:
+        """Сбрасывает состояние. У RandomStrategy нет состояния."""
+        pass
 
 
 class RoundRobinStrategy(SelectionStrategy[T]):
-    """Стратегия round-robin выбора."""
+    """Стратегия round-robin выбора с внутренним состоянием."""
     
-    def select(self, available: Sequence[T], count: int, state: Any = None) -> tuple[List[T], Any]:
+    def __init__(self) -> None:
+        """Инициализация стратегии с внутренним состоянием."""
+        self._state: Optional[int] = None
+    
+    def select(self, available: Sequence[T], count: int, **kwargs) -> List[T]:
         """
-        Выбирает элементы по round-robin.
+        Выбирает элементы по round-robin с учётом полной коллекции.
         
-        State представляет собой индекс последнего выбранного элемента
-        в полной коллекции (не в available).
+        Args:
+            available: Доступные для выбора элементы (подмножество full_collection)
+            count: Количество элементов для выбора
+            **kwargs: Должен содержать 'full_collection' - полную коллекцию элементов
+        
+        Returns:
+            Список выбранных элементов
+            
+        Raises:
+            ValueError: Если full_collection не передана
         """
         if not available:
-            return [], state
+            return []
             
-        if state is None:
-            state = -1
+        if self._state is None:
+            self._state = -1
             
-        # Находим следующий доступный элемент, начиная с состояния
+        full_collection = kwargs.get('full_collection')
+        if full_collection is None:
+            raise ValueError("full_collection обязательна для RoundRobinStrategy")
+            
         selected = []
-        current_state = state
+        actual_count = min(count, len(available))
+        available_set = set(available)
         
-        # Для round-robin берём только 1 элемент (следующий в очереди)
-        actual_count = min(count, 1)
+        # Ищем следующие доступные элементы в полной коллекции
+        attempts = 0
+        max_attempts = len(full_collection) * 2  # Защита от бесконечного цикла
         
-        for _ in range(actual_count):
-            if not available:
-                break
+        while len(selected) < actual_count and attempts < max_attempts:
+            attempts += 1
+            self._state = (self._state + 1) % len(full_collection)
+            candidate = full_collection[self._state]
+            
+            if candidate in available_set:
+                selected.append(candidate)
                 
-            # Находим индекс следующего доступного элемента
-            found = False
-            for i in range(len(available)):
-                # Простая логика: берём следующий после последнего выбранного
-                candidate_idx = (current_state + 1 + i) % len(available)
-                if candidate_idx < len(available):
-                    selected.append(available[candidate_idx])
-                    current_state = candidate_idx
-                    found = True
-                    break
-                    
-            if not found and available:
-                # Если не нашли, берём первый доступный
-                selected.append(available[0])
-                current_state = 0
-                
-        return selected, current_state
+        return selected
+    
+    def reset(self) -> None:
+        """Сбрасывает внутреннее состояние round-robin."""
+        self._state = None
+
+
+class StrategyMapper:
+    """Маппер для создания стратегий выбора по политике."""
+    
+    @staticmethod
+    def create_strategy(policy: SelectionPolicy) -> SelectionStrategy[Any]:
+        """
+        Создаёт стратегию выбора по заданной политике.
+        
+        Args:
+            policy: Политика выбора
+            
+        Returns:
+            Экземпляр соответствующей стратегии
+            
+        Raises:
+            ValueError: Если политика не поддерживается
+        """
+        strategy_map = {
+            SelectionPolicy.RANDOM: RandomStrategy,
+            SelectionPolicy.ROUND_ROBIN: RoundRobinStrategy,
+        }
+        
+        strategy_class = strategy_map.get(policy)
+        if strategy_class is None:
+            raise ValueError(f"Неподдерживаемая политика: {policy}")
+        
+        return strategy_class()
+    
+    @staticmethod
+    def get_strategy_kwargs(policy: SelectionPolicy, full_collection: Sequence = None) -> dict:
+        """
+        Возвращает дополнительные параметры для стратегии.
+        
+        Args:
+            policy: Политика выбора
+            full_collection: Полная коллекция (для round-robin)
+            
+        Returns:
+            Словарь с параметрами для передачи в strategy.select()
+        """
+        if policy == SelectionPolicy.ROUND_ROBIN:
+            return {'full_collection': full_collection}
+        return {}
 
 
 @dataclass
@@ -108,12 +171,10 @@ class ItemSelector(Generic[T]):
     Attributes:
         collection: Полная коллекция элементов
         policy: Политика выбора
-        state: Внутреннее состояние селектора (для round-robin и т.д.)
     """
     
     collection: List[T] = field(default_factory=list)
     policy: SelectionPolicy = SelectionPolicy.RANDOM
-    state: Any = field(default=None)
     
     def __post_init__(self) -> None:
         """Инициализация стратегии на основе политики."""
@@ -121,26 +182,20 @@ class ItemSelector(Generic[T]):
     
     def _create_strategy(self) -> SelectionStrategy[T]:
         """Создаёт стратегию на основе текущей политики."""
-        if self.policy == SelectionPolicy.RANDOM:
-            return RandomStrategy()
-        elif self.policy == SelectionPolicy.ROUND_ROBIN:
-            return RoundRobinStrategy()
-        else:
-            raise ValueError(f"Неподдерживаемая политика: {self.policy}")
+        return StrategyMapper.create_strategy(self.policy)
     
     def set_collection(self, items: Sequence[T]) -> None:
         """Устанавливает коллекцию элементов."""
         self.collection = list(items)
-        # При изменении коллекции сбрасываем состояние
-        self.state = None
+        # При изменении коллекции сбрасываем состояние стратегии
+        self._strategy.reset()
     
     def set_policy(self, policy: SelectionPolicy) -> None:
         """Изменяет политику выбора."""
         if self.policy != policy:
             self.policy = policy
             self._strategy = self._create_strategy()
-            # При изменении политики сбрасываем состояние
-            self.state = None
+            # При изменении политики новая стратегия создается с чистым состоянием
     
     def select_from_available(self, available: Sequence[T], count: int = 1) -> List[T]:
         """
@@ -165,8 +220,12 @@ class ItemSelector(Generic[T]):
             if item not in collection_set:
                 raise ValueError(f"Элемент {item} не найден в коллекции")
         
-        selected, new_state = self._strategy.select(available, count, self.state)
-        self.state = new_state
+        # Получаем дополнительные параметры для стратегии
+        strategy_kwargs = StrategyMapper.get_strategy_kwargs(self.policy, full_collection=self.collection)
+        
+        # Выполняем выбор - стратегия сама управляет состоянием
+        selected = self._strategy.select(available, count, **strategy_kwargs)
+        
         return selected
     
     def select(self, count: int = 1) -> List[T]:
@@ -181,14 +240,14 @@ class ItemSelector(Generic[T]):
         """
         return self.select_from_available(self.collection, count)
     
+
     def reset_state(self) -> None:
-        """Сбрасывает внутреннее состояние селектора."""
-        self.state = None
+        """Сбрасывает внутреннее состояние стратегии."""
+        self._strategy.reset()
         
     def get_info(self) -> dict[str, Any]:
         """Возвращает информацию о текущем состоянии селектора."""
         return {
             "collection_size": len(self.collection),
             "policy": self.policy.value,
-            "state": self.state,
         }

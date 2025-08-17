@@ -492,8 +492,8 @@ async def handle_description_input(message: Message) -> None:
         list(pending.active_selected),
         state,
     )
-    await _post_assignment_to_channel(
-        message, assignees, pending.description, ASSIGN_CHANNEL_ID
+    await _post_assignment(
+        message, assignees, pending.description, target_chat=ASSIGN_CHANNEL_ID
     )
 
     # Очищаем состояние
@@ -569,8 +569,20 @@ def _select_assignees(
 
 
 async def _post_assignment(
-    message: Message, assignees: Sequence[str], description: str
+    message: Message,
+    assignees: Sequence[str],
+    description: str,
+    target_chat: Optional[str] = None,
 ) -> None:
+    """
+    Отправляет сообщение о назначении с @mentions и poll для отметки выполнения.
+
+    Args:
+        message: Исходное сообщение
+        assignees: Список назначенных пользователей
+        description: Описание задачи
+        target_chat: Целевой чат/канал. Если None, отправляется в текущий чат
+    """
     if not assignees:
         try:
             await message.answer("Некого назначать — список пуст.")
@@ -578,58 +590,49 @@ async def _post_assignment(
             pass
         return
 
+    # Определяем куда отправлять и настройки анонимности
+    is_channel = target_chat is not None
+    chat_id = target_chat if is_channel else message.chat.id
+    is_anonymous = is_channel  # Каналы требуют анонимные опросы
+
+    # Формируем текстовое сообщение с @mentions для уведомлений
     assignees_text: str = ", ".join(assignees)
     text: str = f"Назначены: {assignees_text}\n{description}".strip()
-    try:
-        sent: Message = await message.answer(text)
-    except TelegramAPIError as exc:
-        logger.exception("Ошибка при отправке сообщения о назначении: %s", exc)
-        return
 
-    # Create a poll with checkboxes to mark completion
+    # Отправляем текстовое сообщение с @mentions
     try:
-        await message.bot.send_poll(
-            chat_id=message.chat.id,
-            question="Отметьте выполнение",
-            options=["✔️ Done"],
-            is_anonymous=False,
-            allows_multiple_answers=True,
-            reply_to_message_id=sent.message_id,
-        )
+        if is_channel:
+            sent: Message = await message.bot.send_message(chat_id=chat_id, text=text)
+        else:
+            sent: Message = await message.answer(text)
     except TelegramAPIError as exc:
-        logger.exception("Не удалось создать опрос: %s", exc)
-
-
-async def _post_assignment_to_channel(
-    message: Message, assignees: Sequence[str], description: str, channel: str
-) -> None:
-    if not assignees:
-        try:
-            await message.answer("Некого назначать — список пуст.")
-        except TelegramAPIError:
-            pass
-        return
-    assignees_text: str = ", ".join(assignees)
-    text: str = f"Назначены: {assignees_text}\n{description}".strip()
-    try:
-        sent: Message = await message.bot.send_message(chat_id=channel, text=text)
-    except TelegramAPIError as exc:
-        logger.exception("Не удалось отправить сообщение в канал %s: %s", channel, exc)
-        try:
-            await message.answer(
-                "Не удалось отправить в канал. Проверьте права бота и имя канала."
+        if is_channel:
+            logger.exception(
+                "Не удалось отправить сообщение в канал %s: %s", chat_id, exc
             )
-        except TelegramAPIError:
-            pass
+            try:
+                await message.answer(
+                    "Не удалось отправить в канал. Проверьте права бота и имя канала."
+                )
+            except TelegramAPIError:
+                pass
+        else:
+            logger.exception("Ошибка при отправке сообщения о назначении: %s", exc)
         return
+
+    # Создаем poll для отметки выполнения
     try:
+        # Create poll options with assigned users' names
+        poll_options = [f"✔️ {assignee}" for assignee in assignees]
+
         await message.bot.send_poll(
-            chat_id=channel,
-            question="Отметьте выполнение",
-            options=["✔️ Done"],
-            is_anonymous=False,
+            chat_id=chat_id,
+            question="Отметьте выполнение:",
+            options=poll_options,
+            is_anonymous=is_anonymous,
             allows_multiple_answers=True,
-            reply_to_message_id=sent.message_id,
+            reply_to_message_id=sent.message_id,  # Связываем poll с текстовым сообщением
         )
     except TelegramAPIError as exc:
-        logger.exception("Не удалось создать опрос в канале: %s", exc)
+        error_context = "в канале" if is_channel else ""
+        logger.exception("Не удалось создать опрос %s: %s", error_context, exc)

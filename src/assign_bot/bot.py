@@ -129,9 +129,10 @@ EXPECT_CONFIG: Set[int] = set()
 class PendingAssign:
     active_selected: Set[str] = field(default_factory=set)
     policy: Optional[SelectionPolicy] = None
+    count: Optional[int] = None  # количество участников для назначения (1, 2 или 3)
     description: str = ""
     message_id_with_keyboard: Optional[int] = None
-    step: Optional[str] = None  # 'configure' | 'await_description'
+    step: Optional[str] = None  # 'configure' | 'await_count' | 'await_description'
 
 
 PENDING: Dict[int, PendingAssign] = {}
@@ -287,6 +288,19 @@ def _build_toggle_keyboard(
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
+def _build_count_keyboard() -> InlineKeyboardMarkup:
+    """Создаёт клавиатуру для выбора количества участников для назначения."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="1️⃣ участник", callback_data="count::1"),
+                InlineKeyboardButton(text="2️⃣ участника", callback_data="count::2"),
+                InlineKeyboardButton(text="3️⃣ участника", callback_data="count::3"),
+            ]
+        ]
+    )
+
+
 @router.callback_query(F.data == "assign_help")
 async def assign_help(cb: CallbackQuery) -> None:
     try:
@@ -319,8 +333,8 @@ async def cmd_assign(message: Message) -> None:
     pending: PendingAssign = PENDING.setdefault(chat_id, PendingAssign())
     pending.active_selected = set()
     pending.policy = None
+    pending.count = None
     pending.description = ""
-    pending.target_channel = None
     pending.step = "configure"
     try:
         sent: Message = await message.answer(
@@ -453,6 +467,38 @@ async def handle_policy(cb: CallbackQuery) -> None:
         except TelegramAPIError:
             pass
         return
+    pending.step = "await_count"
+    try:
+        await cb.message.edit_text(
+            "Выберите количество участников для назначения:",
+            reply_markup=_build_count_keyboard(),
+        )
+        await cb.answer()
+    except TelegramAPIError as exc:
+        logger.exception("Ошибка на шаге выбора количества: %s", exc)
+        return
+    # Следующий callback — выбор количества участников
+
+
+@router.callback_query(F.data.startswith("count::"))
+async def handle_count(cb: CallbackQuery) -> None:
+    """Обрабатывает выбор количества участников для назначения."""
+    chat_id: int = cb.message.chat.id
+    pending: PendingAssign = PENDING.setdefault(chat_id, PendingAssign())
+
+    count_str: str = cb.data.split("::", 1)[1]
+    try:
+        count = int(count_str)
+        if count not in [1, 2, 3]:
+            raise ValueError("Invalid count")
+        pending.count = count
+    except ValueError:
+        try:
+            await cb.answer("Неизвестное количество участников", show_alert=True)
+        except TelegramAPIError:
+            pass
+        return
+
     pending.step = "await_description"
     try:
         await cb.message.edit_text("Введите описание задачи (произвольный текст)")
@@ -460,7 +506,6 @@ async def handle_policy(cb: CallbackQuery) -> None:
     except TelegramAPIError as exc:
         logger.exception("Ошибка на шаге описания: %s", exc)
         return
-    # Следующее текстовое сообщение — описание (обрабатывается в общем текстовом обработчике)
 
 
 async def handle_description_input(message: Message) -> None:
@@ -491,6 +536,7 @@ async def handle_description_input(message: Message) -> None:
         pending.policy or SelectionPolicy.ROUND_ROBIN,
         list(pending.active_selected),
         state,
+        pending.count or 1,  # Используем выбранное количество или 1 по умолчанию
     )
     await _post_assignment(
         message, assignees, pending.description, target_chat=ASSIGN_CHANNEL_ID
@@ -527,7 +573,7 @@ async def handle_text_steps(message: Message) -> None:
 
 
 def _select_assignees(
-    policy: SelectionPolicy, active: Sequence[str], state: UserConfig
+    policy: SelectionPolicy, active: Sequence[str], state: UserConfig, count: int
 ) -> List[str]:
     """
     Выбирает участников для назначения используя ItemSelector.
@@ -536,6 +582,7 @@ def _select_assignees(
         policy: Политика выбора
         active: Список активных участников (подмножество от state.usernames)
         state: Конфигурация пользователя с селектором
+        count: Количество участников для выбора (1, 2 или 3)
 
     Returns:
         Список выбранных участников
@@ -543,19 +590,14 @@ def _select_assignees(
     if not active:
         return []
 
+    # Проверяем, что count не превышает количество активных участников
+    actual_count = min(count, len(active))
+
     # Устанавливаем политику и выбираем из активных участников
     state.selector.set_policy(policy)
 
-    # Определяем количество участников для выбора
-    if policy == SelectionPolicy.RANDOM:
-        # Для random выбираем 1-2 участника в зависимости от размера команды
-        count = 2 if len(active) >= 2 else 1
-    else:
-        # Для round-robin тоже выбираем 1-2 участника в зависимости от размера команды
-        count = 2 if len(active) >= 2 else 1
-
     try:
-        selected = state.selector.select_from_available(active, count)
+        selected = state.selector.select_from_available(active, actual_count)
         return selected
     except ValueError:
         # Если возникла ошибка (например, active содержит элементы не из коллекции),
@@ -564,7 +606,8 @@ def _select_assignees(
         if not valid_active:
             return []
         state.selector.set_collection(state.usernames)
-        selected = state.selector.select_from_available(valid_active, count)
+        actual_count = min(count, len(valid_active))
+        selected = state.selector.select_from_available(valid_active, actual_count)
         return selected
 
 

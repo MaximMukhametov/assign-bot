@@ -54,7 +54,7 @@ class TestSelectAssignees:
 
     def test_select_assignees_empty_active(self, mock_state):
         """Тест выбора с пустым списком активных."""
-        result = _select_assignees(SelectionPolicy.RANDOM, [], mock_state)
+        result = _select_assignees(SelectionPolicy.RANDOM, [], mock_state, 2)
 
         assert result == []
 
@@ -62,7 +62,7 @@ class TestSelectAssignees:
         """Тест выбора с политикой RANDOM."""
         active = ["@alice", "@charlie"]
 
-        result = _select_assignees(SelectionPolicy.RANDOM, active, mock_state)
+        result = _select_assignees(SelectionPolicy.RANDOM, active, mock_state, 2)
 
         # Для команды из 2 человек выбираем 2
         assert len(result) == 2
@@ -73,7 +73,7 @@ class TestSelectAssignees:
         """Тест выбора с политикой RANDOM для большой команды."""
         active = ["@alice", "@bob", "@charlie"]  # >= 2 человек
 
-        result = _select_assignees(SelectionPolicy.RANDOM, active, mock_state)
+        result = _select_assignees(SelectionPolicy.RANDOM, active, mock_state, 2)
 
         # Для команды >= 2 человек выбираем 2
         assert len(result) == 2
@@ -83,7 +83,7 @@ class TestSelectAssignees:
         """Тест выбора с политикой RANDOM для маленькой команды."""
         active = ["@alice"]  # < 2 человек
 
-        result = _select_assignees(SelectionPolicy.RANDOM, active, mock_state)
+        result = _select_assignees(SelectionPolicy.RANDOM, active, mock_state, 1)
 
         # Для команды < 2 человек выбираем 1
         assert len(result) == 1
@@ -93,7 +93,7 @@ class TestSelectAssignees:
         """Тест выбора с политикой ROUND_ROBIN."""
         active = ["@alice", "@charlie", "@david"]
 
-        result = _select_assignees(SelectionPolicy.ROUND_ROBIN, active, mock_state)
+        result = _select_assignees(SelectionPolicy.ROUND_ROBIN, active, mock_state, 2)
 
         # Round-robin для команды >= 2 выбирает 2 человек
         assert len(result) == 2
@@ -106,7 +106,9 @@ class TestSelectAssignees:
 
         results = []
         for _ in range(3):  # 3 выбора
-            result = _select_assignees(SelectionPolicy.ROUND_ROBIN, active, mock_state)
+            result = _select_assignees(
+                SelectionPolicy.ROUND_ROBIN, active, mock_state, 2
+            )
             results.extend(result)
 
         # Каждый выбор возвращает 2 участника, итого 6 результатов
@@ -120,7 +122,7 @@ class TestSelectAssignees:
         active = ["@alice", "@unknown_user"]
 
         # Функция должна обработать ошибку и отфильтровать валидных пользователей
-        result = _select_assignees(SelectionPolicy.RANDOM, active, mock_state)
+        result = _select_assignees(SelectionPolicy.RANDOM, active, mock_state, 2)
 
         # Должен выбрать только валидных пользователей (только @alice)
         assert len(result) == 1
@@ -208,7 +210,7 @@ class TestIntegrationFlows:
         assignments = []
         for _ in range(4):
             assigned = _select_assignees(
-                SelectionPolicy.ROUND_ROBIN, active_users, state
+                SelectionPolicy.ROUND_ROBIN, active_users, state, 2
             )
             assignments.extend(assigned)
 
@@ -234,7 +236,7 @@ class TestIntegrationFlows:
         # 3. Выполняем random назначение
         active_users = usernames  # Все активны
 
-        assigned = _select_assignees(SelectionPolicy.RANDOM, active_users, state)
+        assigned = _select_assignees(SelectionPolicy.RANDOM, active_users, state, 2)
 
         # Для команды >= 2 должно выбрать 2 человек
         assert len(assigned) == 2
@@ -253,15 +255,15 @@ class TestIntegrationFlows:
         active = ["@a", "@c"]
 
         # Начинаем с round-robin
-        rr_result = _select_assignees(SelectionPolicy.ROUND_ROBIN, active, state)
+        rr_result = _select_assignees(SelectionPolicy.ROUND_ROBIN, active, state, 2)
         assert len(rr_result) == 2  # Для 2 активных выберет 2
 
         # Переключаемся на random
-        random_result = _select_assignees(SelectionPolicy.RANDOM, active, state)
+        random_result = _select_assignees(SelectionPolicy.RANDOM, active, state, 2)
         assert len(random_result) == 2  # Для 2 активных выберет 2
 
         # Возвращаемся к round-robin (состояние должно сброситься)
-        rr_result2 = _select_assignees(SelectionPolicy.ROUND_ROBIN, active, state)
+        rr_result2 = _select_assignees(SelectionPolicy.ROUND_ROBIN, active, state, 2)
         assert len(rr_result2) == 2  # Для 2 активных выберет 2
 
 
@@ -293,7 +295,7 @@ class TestRealWorldScenarios:
             else:
                 active = team
 
-            assigned = _select_assignees(SelectionPolicy.ROUND_ROBIN, active, state)
+            assigned = _select_assignees(SelectionPolicy.ROUND_ROBIN, active, state, 1)
             weekly_assignments.append((week, assigned[0] if assigned else None))
 
         # Проверяем, что никто не пропущен надолго
@@ -314,7 +316,7 @@ class TestRealWorldScenarios:
         # Распределяем задачи случайно (по 2 человека на задачу)
         task_assignments = []
         for task_id in range(5):
-            assigned = _select_assignees(SelectionPolicy.RANDOM, team, state)
+            assigned = _select_assignees(SelectionPolicy.RANDOM, team, state, 2)
             task_assignments.append((task_id, assigned))
 
         # Проверяем разнообразие

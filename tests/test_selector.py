@@ -52,14 +52,14 @@ class TestRandomStrategy:
         strategy = RandomStrategy[str]()
         available = ["a", "b", "c"]
 
-        # Выполняем несколько выборов
+        # Perform several selections
         selected1 = strategy.select(available, count=2)
-        strategy.reset()  # Не должно влиять на следующие выборы
+        strategy.reset()  # Should not affect next selections
         selected2 = strategy.select(available, count=2)
         strategy.reset()
         selected3 = strategy.select(available, count=2)
 
-        # Все выборы корректны
+        # All selections are correct
         for selected in [selected1, selected2, selected3]:
             assert len(selected) == 2
             assert all(item in available for item in selected)
@@ -130,21 +130,21 @@ class TestRoundRobinStrategy:
         """Test round-robin with partially available elements."""
         strategy = RoundRobinStrategy[str]()
         full_collection = ["a", "b", "c", "d", "e"]
-        available = ["a", "c", "e"]  # Пропускаем b и d
+        available = ["a", "c", "e"]  # Skip b and d
 
         selections = []
 
-        # Делаем несколько выборов
+        # Make several selections
         for _ in range(6):
             selected = strategy.select(
                 available, count=1, full_collection=full_collection
             )
             selections.extend(selected)
 
-        # Должны получить цикл только из доступных элементов
+        # Should get cycle only from available elements
         assert len(selections) == 6
         assert all(item in available for item in selections)
-        # Проверяем, что все доступные элементы были выбраны
+        # Check that all available elements were selected
         assert set(selections) == set(available)
 
     def test_requires_full_collection(self):
@@ -152,7 +152,7 @@ class TestRoundRobinStrategy:
         strategy = RoundRobinStrategy[str]()
         available = ["a", "b", "c"]
 
-        with pytest.raises(ValueError, match="full_collection обязательна"):
+        with pytest.raises(ValueError, match="full_collection is required"):
             strategy.select(available, count=1)
 
     def test_state_persistence_with_partial_available(self):
@@ -160,27 +160,27 @@ class TestRoundRobinStrategy:
         strategy = RoundRobinStrategy[str]()
         full_collection = ["alice", "bob", "charlie", "david"]
 
-        # Первый выбор: все доступны
+        # First selection: all available
         available1 = ["alice", "bob", "charlie", "david"]
         selected1 = strategy.select(
             available1, count=1, full_collection=full_collection
         )
         assert selected1 == ["alice"]
 
-        # Второй выбор: bob недоступен
+        # Second selection: bob unavailable
         available2 = ["alice", "charlie", "david"]
         selected2 = strategy.select(
             available2, count=1, full_collection=full_collection
         )
-        # Должен перейти к charlie (пропустив bob)
+        # Should move to charlie (skipping bob)
         assert selected2 == ["charlie"]
 
-        # Третий выбор: все снова доступны
+        # Third selection: all available again
         available3 = ["alice", "bob", "charlie", "david"]
         selected3 = strategy.select(
             available3, count=1, full_collection=full_collection
         )
-        # Должен выбрать david (следующий после charlie)
+        # Should select david (next after charlie)
         assert selected3 == ["david"]
 
     def test_reset_state(self):
@@ -189,7 +189,7 @@ class TestRoundRobinStrategy:
         full_collection = ["a", "b", "c"]
         available = ["a", "b", "c"]
 
-        # Делаем несколько выборов
+        # Make several selections
         assert strategy.select(available, count=1, full_collection=full_collection) == [
             "a"
         ]
@@ -197,10 +197,10 @@ class TestRoundRobinStrategy:
             "b"
         ]
 
-        # Сбрасываем состояние
+        # Reset state
         strategy.reset()
 
-        # Должен начать сначала
+        # Should start from beginning
         assert strategy.select(available, count=1, full_collection=full_collection) == [
             "a"
         ]
@@ -233,32 +233,32 @@ class TestItemSelector:
         selector = ItemSelector[str]()
         selector.set_collection(["a", "b", "c"])
 
-        # Сначала Random
+        # First Random
         assert selector.policy == SelectionPolicy.RANDOM
 
-        # Меняем на RoundRobin
+        # Change to RoundRobin
         selector.set_policy(SelectionPolicy.ROUND_ROBIN)
         assert selector.policy == SelectionPolicy.ROUND_ROBIN
 
-        # Проверяем что новая стратегия работает
+        # Check that new strategy works
         result1 = selector.select(count=1)
         result2 = selector.select(count=1)
-        assert result1 != result2  # Round-robin даёт разные результаты
+        assert result1 != result2  # Round-robin gives different results
 
     def test_selector_set_same_policy(self):
         """Test setting same policy (optimization - don't recreate strategy)."""
         selector = ItemSelector[str]()
         selector.set_collection(["a", "b", "c"])
 
-        # Запоминаем текущую стратегию
+        # Remember current strategy
         original_strategy = selector._strategy
 
-        # Устанавливаем ту же политику
+        # Set same policy
         selector.set_policy(SelectionPolicy.RANDOM)
 
-        # Политика не изменилась, стратегия тоже не должна пересоздаваться
+        # Policy unchanged, strategy should not be recreated
         assert selector.policy == SelectionPolicy.RANDOM
-        assert selector._strategy is original_strategy  # Та же самая стратегия
+        assert selector._strategy is original_strategy  # Same strategy instance
 
     def test_selector_random_selection(self, sample_users):
         """Test random selection through selector."""
@@ -303,9 +303,9 @@ class TestItemSelector:
         selector = ItemSelector[str]()
         selector.set_collection(sample_users)
 
-        available = ["@alice", "@unknown_user"]  # unknown_user не в коллекции
+        available = ["@alice", "@unknown_user"]  # unknown_user not in collection
 
-        with pytest.raises(ValueError, match="не найден в коллекции"):
+        with pytest.raises(ValueError, match="not found in collection"):
             selector.select_from_available(available, count=1)
 
     def test_selector_select_from_empty_available(self, sample_users):
@@ -331,16 +331,16 @@ class TestItemSelector:
         selector.set_collection(sample_users)
         selector.set_policy(SelectionPolicy.ROUND_ROBIN)
 
-        # Делаем выборы - проверяем что reset работает
+        # Make selections - check that reset works
         result1 = selector.select(count=1)
         result2 = selector.select(count=1)
 
-        # Сбрасываем состояние
+        # Reset state
         selector.reset_state()
 
-        # После сброса должен начать сначала
+        # After reset should start from beginning
         result3 = selector.select(count=1)
-        assert result3 == result1  # Начинает сначала
+        assert result3 == result1  # Starts from beginning
 
     def test_selector_get_info(self, sample_users):
         """Test getting selector information."""
@@ -352,16 +352,16 @@ class TestItemSelector:
 
         assert info["collection_size"] == len(sample_users)
         assert info["policy"] == SelectionPolicy.ROUND_ROBIN.value
-        assert len(info) == 2  # Только размер коллекции и политика
+        assert len(info) == 2  # Only collection size and policy
 
     def test_selector_unsupported_policy(self):
         """Test unsupported policy."""
         selector = ItemSelector[str]()
 
-        # Напрямую устанавливаем недопустимую политику
+        # Directly set invalid policy
         selector.policy = "invalid_policy"  # type: ignore
 
-        with pytest.raises(ValueError, match="Неподдерживаемая политика"):
+        with pytest.raises(ValueError, match="Unsupported policy"):
             selector._create_strategy()
 
 
@@ -370,25 +370,25 @@ class TestIntegrationScenarios:
 
     def test_telegram_bot_scenario(self):
         """Test Telegram bot usage scenario."""
-        # Инициализация как в боте
+        # Initialization like in bot
         all_participants = ["@alice", "@bob", "@charlie", "@david", "@eve"]
         selector = ItemSelector[str]()
         selector.set_collection(all_participants)
 
-        # Сценарий 1: Round-robin назначение
+        # Scenario 1: Round-robin assignment
         selector.set_policy(SelectionPolicy.ROUND_ROBIN)
-        active_today = ["@alice", "@charlie", "@eve"]  # Не все активны
+        active_today = ["@alice", "@charlie", "@eve"]  # Not all active
 
         assigned1 = selector.select_from_available(active_today, count=1)
         assigned2 = selector.select_from_available(active_today, count=1)
         assigned3 = selector.select_from_available(active_today, count=1)
         assigned4 = selector.select_from_available(active_today, count=1)
 
-        # Check cyclicity в рамках активных
+        # Check cyclicity within active users
         all_assigned = [assigned1[0], assigned2[0], assigned3[0], assigned4[0]]
         assert len(set(all_assigned)) <= len(active_today)
 
-        # Сценарий 2: Random назначение
+        # Scenario 2: Random assignment
         selector.set_policy(SelectionPolicy.RANDOM)
 
         assigned_random = selector.select_from_available(active_today, count=2)
@@ -402,13 +402,13 @@ class TestIntegrationScenarios:
         selector.set_collection(users)
         selector.set_policy(SelectionPolicy.ROUND_ROBIN)
 
-        # Делаем несколько выборов
+        # Make several selections
         results = []
         for _ in range(6):
             selected = selector.select(count=1)
             results.extend(selected)
 
-        # Проверяем, что состояние корректно сохранялось
+        # Check that state was correctly preserved
         expected = users * 2  # 2 full cycles
         assert results == expected
 

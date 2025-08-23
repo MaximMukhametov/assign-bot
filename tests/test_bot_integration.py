@@ -152,11 +152,11 @@ class TestChatState:
     def test_get_chat_state_existing_chat(self):
         """Test getting state for existing chat."""
         chat_id = 12345
-        # Создаём состояние
+        # Create state
         first_state = _get_chat_state(chat_id)
         first_state.usernames = ["@test_user"]
 
-        # Получаем то же состояние
+        # Get same state
         second_state = _get_chat_state(chat_id)
 
         assert second_state is first_state
@@ -172,7 +172,7 @@ class TestDefaultUsers:
         assert len(DEFAULT_USERNAMES) > 0
         assert all(username.startswith("@") for username in DEFAULT_USERNAMES)
 
-        # Проверяем конкретных пользователей из требований
+        # Check specific users from requirements
         expected_users = {
             "@MaksimMukhametov",
             "@jellex",
@@ -194,19 +194,19 @@ class TestIntegrationFlows:
         """Test full assignment flow with round-robin."""
         chat_id = 12345
 
-        # 1. Получаем состояние чата (новый чат)
+        # 1. Get chat state (new chat)
         state = _get_chat_state(chat_id)
         assert state.usernames == []
 
-        # 2. Устанавливаем участников (имитируем /configure)
+        # 2. Set participants (simulate /configure)
         usernames = ["@alice", "@bob", "@charlie"]
         state.usernames = usernames
         state.selector.set_collection(usernames)
 
-        # 3. Выполняем назначения (имитируем /assign)
-        active_users = ["@alice", "@charlie"]  # Bob не активен сегодня
+        # 3. Perform assignments (simulate /assign)
+        active_users = ["@alice", "@charlie"]  # Bob not active today
 
-        # Несколько назначений подряд
+        # Several assignments in a row
         assignments = []
         for _ in range(4):
             assigned = _select_assignees(
@@ -214,10 +214,10 @@ class TestIntegrationFlows:
             )
             assignments.extend(assigned)
 
-        # Проверяем результаты
-        assert len(assignments) == 8  # 4 назначения по 2 человека = 8
+        # Check results
+        assert len(assignments) == 8  # 4 assignments with 2 people each = 8
         assert all(user in active_users for user in assignments)
-        # Должна быть цикличность между @alice и @charlie
+        # Should be cyclicity between @alice and @charlie
         unique_assigned = set(assignments)
         assert unique_assigned.issubset(set(active_users))
 
@@ -225,23 +225,23 @@ class TestIntegrationFlows:
         """Test full assignment flow with random."""
         chat_id = 67890
 
-        # 1. Получаем состояние чата
+        # 1. Get chat state
         state = _get_chat_state(chat_id)
 
-        # 2. Устанавливаем участников
+        # 2. Set participants
         usernames = ["@user1", "@user2", "@user3", "@user4"]
         state.usernames = usernames
         state.selector.set_collection(usernames)
 
-        # 3. Выполняем random назначение
-        active_users = usernames  # Все активны
+        # 3. Perform random assignment
+        active_users = usernames  # All active
 
         assigned = _select_assignees(SelectionPolicy.RANDOM, active_users, state, 2)
 
-        # Для команды >= 2 должно выбрать 2 человек
+        # For team >= 2 should select 2 people
         assert len(assigned) == 2
         assert all(user in active_users for user in assigned)
-        assert len(set(assigned)) == 2  # Без дубликатов
+        assert len(set(assigned)) == 2  # No duplicates
 
     def test_policy_switch_during_usage(self):
         """Test policy switching during usage."""
@@ -254,17 +254,17 @@ class TestIntegrationFlows:
 
         active = ["@a", "@c"]
 
-        # Начинаем с round-robin
+        # Start with round-robin
         rr_result = _select_assignees(SelectionPolicy.ROUND_ROBIN, active, state, 2)
-        assert len(rr_result) == 2  # Для 2 активных выберет 2
+        assert len(rr_result) == 2  # For 2 active will select 2
 
-        # Переключаемся на random
+        # Switch to random
         random_result = _select_assignees(SelectionPolicy.RANDOM, active, state, 2)
-        assert len(random_result) == 2  # Для 2 активных выберет 2
+        assert len(random_result) == 2  # For 2 active will select 2
 
-        # Возвращаемся к round-robin (состояние должно сброситься)
+        # Return to round-robin (state should reset)
         rr_result2 = _select_assignees(SelectionPolicy.ROUND_ROBIN, active, state, 2)
-        assert len(rr_result2) == 2  # Для 2 активных выберет 2
+        assert len(rr_result2) == 2  # For 2 active will select 2
 
 
 class TestRealWorldScenarios:
@@ -279,30 +279,30 @@ class TestRealWorldScenarios:
         chat_id = 999
         state = _get_chat_state(chat_id)
 
-        # Команда разработки
+        # Development team
         team = ["@dev1", "@dev2", "@dev3", "@dev4", "@dev5"]
         state.usernames = team
         state.selector.set_collection(team)
 
-        # Каждую неделю назначаем дежурного (round-robin)
+        # Each week assign duty person (round-robin)
         weekly_assignments = []
-        for week in range(10):  # 10 недель
-            # Иногда кто-то в отпуске
+        for week in range(10):  # 10 weeks
+            # Sometimes someone is on vacation
             if week == 3:
-                active = ["@dev1", "@dev2", "@dev4"]  # dev3, dev5 в отпуске
+                active = ["@dev1", "@dev2", "@dev4"]  # dev3, dev5 on vacation
             elif week == 7:
-                active = ["@dev2", "@dev3", "@dev4", "@dev5"]  # dev1 в отпуске
+                active = ["@dev2", "@dev3", "@dev4", "@dev5"]  # dev1 on vacation
             else:
                 active = team
 
             assigned = _select_assignees(SelectionPolicy.ROUND_ROBIN, active, state, 1)
             weekly_assignments.append((week, assigned[0] if assigned else None))
 
-        # Проверяем, что никто не пропущен надолго
+        # Check that no one is skipped for long
         assigned_users = [user for week, user in weekly_assignments if user]
         assert (
             len(set(assigned_users)) >= 3
-        )  # Минимум 3 разных пользователя за 10 недель
+        )  # Minimum 3 different users in 10 weeks
 
     def test_random_task_distribution(self):
         """Test random task distribution."""
@@ -313,17 +313,17 @@ class TestRealWorldScenarios:
         state.usernames = team
         state.selector.set_collection(team)
 
-        # Распределяем задачи случайно (по 2 человека на задачу)
+        # Distribute tasks randomly (2 people per task)
         task_assignments = []
         for task_id in range(5):
             assigned = _select_assignees(SelectionPolicy.RANDOM, team, state, 2)
             task_assignments.append((task_id, assigned))
 
-        # Проверяем разнообразие
+        # Check diversity
         all_assigned = []
         for task_id, assigned in task_assignments:
             all_assigned.extend(assigned)
 
-        # Каждый должен получить задачи
+        # Everyone should get tasks
         unique_assigned = set(all_assigned)
-        assert len(unique_assigned) >= 2  # Минимум 2 разных человека получили задачи
+        assert len(unique_assigned) >= 2  # Minimum 2 different people got tasks

@@ -20,7 +20,7 @@ async def run_bot() -> None:
 
     token: str | None = os.environ.get("BOT_TOKEN")
     if not token:
-        logger.error("Переменная окружения BOT_TOKEN не установлена")
+        logger.error("Environment variable BOT_TOKEN is not set")
         return
 
     bot: Bot | None = None
@@ -29,10 +29,10 @@ async def run_bot() -> None:
         dispatcher = Dispatcher()
         dispatcher.include_router(router)
 
-        logger.info("Старт поллинга Telegram бота")
+        logger.info("Starting Telegram bot polling")
         await dispatcher.start_polling(bot)
-    except Exception as exc:  # noqa: BLE001 - верхнеуровневая защита точки входа
-        logger.exception("Критическая ошибка работы бота: %s", exc)
+    except Exception as exc:  # noqa: BLE001 - top-level entry point protection
+        logger.exception("Critical bot error: %s", exc)
     finally:
         if bot is not None:
             await bot.session.close()

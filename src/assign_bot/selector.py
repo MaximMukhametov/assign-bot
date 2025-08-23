@@ -1,8 +1,8 @@
 """
-Модуль для выбора элементов из коллекции с различными стратегиями.
+Module for selecting elements from collection with various strategies.
 
-Предоставляет универсальный класс ItemSelector для выбора N элементов
-из заранее установленной коллекции с поддержкой различных политик выбора.
+Provides universal ItemSelector class for selecting N elements
+from a pre-configured collection with support for different selection policies.
 """
 
 from __future__ import annotations
@@ -17,41 +17,41 @@ T = TypeVar("T")
 
 
 class SelectionPolicy(str, Enum):
-    """Политики выбора элементов из коллекции."""
+    """Policies for selecting elements from collection."""
 
     ROUND_ROBIN = "round_robin"
     RANDOM = "random"
 
 
 class SelectionStrategy(ABC, Generic[T]):
-    """Абстрактная стратегия выбора элементов."""
+    """Abstract strategy for selecting elements."""
 
     @abstractmethod
     def select(self, available: Sequence[T], count: int, **kwargs) -> List[T]:
         """
-        Выбирает элементы из доступных.
+        Selects elements from available ones.
 
         Args:
-            available: Доступные для выбора элементы
-            count: Количество элементов для выбора
-            **kwargs: Дополнительные параметры для стратегии
+            available: Available elements for selection
+            count: Number of elements to select
+            **kwargs: Additional parameters for strategy
 
         Returns:
-            Список выбранных элементов
+            List of selected elements
         """
         pass
 
     @abstractmethod
     def reset(self) -> None:
-        """Сбрасывает внутреннее состояние стратегии."""
+        """Resets internal state of the strategy."""
         pass
 
 
 class RandomStrategy(SelectionStrategy[T]):
-    """Стратегия случайного выбора."""
+    """Random selection strategy."""
 
     def select(self, available: Sequence[T], count: int, **kwargs) -> List[T]:
-        """Выбирает случайные элементы без повторений."""
+        """Selects random elements without repetition."""
         if not available:
             return []
 
@@ -60,31 +60,31 @@ class RandomStrategy(SelectionStrategy[T]):
         return selected
 
     def reset(self) -> None:
-        """Сбрасывает состояние. У RandomStrategy нет состояния."""
+        """Resets state. RandomStrategy has no state."""
         pass
 
 
 class RoundRobinStrategy(SelectionStrategy[T]):
-    """Стратегия round-robin выбора с внутренним состоянием."""
+    """Round-robin selection strategy with internal state."""
 
     def __init__(self) -> None:
-        """Инициализация стратегии с внутренним состоянием."""
+        """Initialize strategy with internal state."""
         self._state: Optional[int] = None
 
     def select(self, available: Sequence[T], count: int, **kwargs) -> List[T]:
         """
-        Выбирает элементы по round-robin с учётом полной коллекции.
+        Selects elements by round-robin considering full collection.
 
         Args:
-            available: Доступные для выбора элементы (подмножество full_collection)
-            count: Количество элементов для выбора
-            **kwargs: Должен содержать 'full_collection' - полную коллекцию элементов
+            available: Available elements for selection (subset of full_collection)
+            count: Number of elements to select
+            **kwargs: Must contain 'full_collection' - full collection of elements
 
         Returns:
-            Список выбранных элементов
+            List of selected elements
 
         Raises:
-            ValueError: Если full_collection не передана
+            ValueError: If full_collection is not provided
         """
         if not available:
             return []
@@ -94,15 +94,15 @@ class RoundRobinStrategy(SelectionStrategy[T]):
 
         full_collection = kwargs.get("full_collection")
         if full_collection is None:
-            raise ValueError("full_collection обязательна для RoundRobinStrategy")
+            raise ValueError("full_collection is required for RoundRobinStrategy")
 
         selected = []
         actual_count = min(count, len(available))
         available_set = set(available)
 
-        # Ищем следующие доступные элементы в полной коллекции
+        # Search for next available elements in full collection
         attempts = 0
-        max_attempts = len(full_collection) * 2  # Защита от бесконечного цикла
+        max_attempts = len(full_collection) * 2  # Protection from infinite loop
 
         while len(selected) < actual_count and attempts < max_attempts:
             attempts += 1
@@ -115,26 +115,26 @@ class RoundRobinStrategy(SelectionStrategy[T]):
         return selected
 
     def reset(self) -> None:
-        """Сбрасывает внутреннее состояние round-robin."""
+        """Resets internal round-robin state."""
         self._state = None
 
 
 class StrategyMapper:
-    """Маппер для создания стратегий выбора по политике."""
+    """Mapper for creating selection strategies by policy."""
 
     @staticmethod
     def create_strategy(policy: SelectionPolicy) -> SelectionStrategy[Any]:
         """
-        Создаёт стратегию выбора по заданной политике.
+        Creates selection strategy for given policy.
 
         Args:
-            policy: Политика выбора
+            policy: Selection policy
 
         Returns:
-            Экземпляр соответствующей стратегии
+            Instance of corresponding strategy
 
         Raises:
-            ValueError: Если политика не поддерживается
+            ValueError: If policy is not supported
         """
         strategy_map = {
             SelectionPolicy.RANDOM: RandomStrategy,
@@ -143,7 +143,7 @@ class StrategyMapper:
 
         strategy_class = strategy_map.get(policy)
         if strategy_class is None:
-            raise ValueError(f"Неподдерживаемая политика: {policy}")
+            raise ValueError(f"Unsupported policy: {policy}")
 
         return strategy_class()
 
@@ -152,14 +152,14 @@ class StrategyMapper:
         policy: SelectionPolicy, full_collection: Sequence = None
     ) -> dict:
         """
-        Возвращает дополнительные параметры для стратегии.
+        Returns additional parameters for strategy.
 
         Args:
-            policy: Политика выбора
-            full_collection: Полная коллекция (для round-robin)
+            policy: Selection policy
+            full_collection: Full collection (for round-robin)
 
         Returns:
-            Словарь с параметрами для передачи в strategy.select()
+            Dictionary with parameters for passing to strategy.select()
         """
         if policy == SelectionPolicy.ROUND_ROBIN:
             return {"full_collection": full_collection}
@@ -169,88 +169,88 @@ class StrategyMapper:
 @dataclass
 class ItemSelector(Generic[T]):
     """
-    Универсальный селектор элементов с поддержкой различных стратегий.
+    Universal element selector with support for various strategies.
 
     Attributes:
-        collection: Полная коллекция элементов
-        policy: Политика выбора
+        collection: Full collection of elements
+        policy: Selection policy
     """
 
     collection: List[T] = field(default_factory=list)
     policy: SelectionPolicy = SelectionPolicy.RANDOM
 
     def __post_init__(self) -> None:
-        """Инициализация стратегии на основе политики."""
+        """Initialize strategy based on policy."""
         self._strategy = self._create_strategy()
 
     def _create_strategy(self) -> SelectionStrategy[T]:
-        """Создаёт стратегию на основе текущей политики."""
+        """Creates strategy based on current policy."""
         return StrategyMapper.create_strategy(self.policy)
 
     def set_collection(self, items: Sequence[T]) -> None:
-        """Устанавливает коллекцию элементов."""
+        """Sets collection of elements."""
         self.collection = list(items)
-        # При изменении коллекции сбрасываем состояние стратегии
+        # Reset strategy state when collection changes
         self._strategy.reset()
 
     def set_policy(self, policy: SelectionPolicy) -> None:
-        """Изменяет политику выбора."""
+        """Changes selection policy."""
         if self.policy != policy:
             self.policy = policy
             self._strategy = self._create_strategy()
-            # При изменении политики новая стратегия создается с чистым состоянием
+            # When policy changes, new strategy is created with clean state
 
     def select_from_available(self, available: Sequence[T], count: int = 1) -> List[T]:
         """
-        Выбирает элементы из подмножества доступных.
+        Selects elements from subset of available ones.
 
         Args:
-            available: Подмножество элементов для выбора (должны быть из collection)
-            count: Количество элементов для выбора
+            available: Subset of elements for selection (must be from collection)
+            count: Number of elements to select
 
         Returns:
-            Список выбранных элементов
+            List of selected elements
 
         Raises:
-            ValueError: Если available содержит элементы не из collection
+            ValueError: If available contains elements not from collection
         """
         if not available:
             return []
 
-        # Проверяем, что все available элементы есть в коллекции
+        # Check that all available elements are in collection
         collection_set = set(self.collection)
         for item in available:
             if item not in collection_set:
-                raise ValueError(f"Элемент {item} не найден в коллекции")
+                raise ValueError(f"Element {item} not found in collection")
 
-        # Получаем дополнительные параметры для стратегии
+        # Get additional parameters for strategy
         strategy_kwargs = StrategyMapper.get_strategy_kwargs(
             self.policy, full_collection=self.collection
         )
 
-        # Выполняем выбор - стратегия сама управляет состоянием
+        # Perform selection - strategy manages state itself
         selected = self._strategy.select(available, count, **strategy_kwargs)
 
         return selected
 
     def select(self, count: int = 1) -> List[T]:
         """
-        Выбирает элементы из всей коллекции.
+        Selects elements from entire collection.
 
         Args:
-            count: Количество элементов для выбора
+            count: Number of elements to select
 
         Returns:
-            Список выбранных элементов
+            List of selected elements
         """
         return self.select_from_available(self.collection, count)
 
     def reset_state(self) -> None:
-        """Сбрасывает внутреннее состояние стратегии."""
+        """Resets internal state of strategy."""
         self._strategy.reset()
 
     def get_info(self) -> dict[str, Any]:
-        """Возвращает информацию о текущем состоянии селектора."""
+        """Returns information about current selector state."""
         return {
             "collection_size": len(self.collection),
             "policy": self.policy.value,

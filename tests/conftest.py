@@ -1,13 +1,13 @@
 """
-Конфигурация pytest.
+Pytest configuration.
 
-Настройка путей импорта и общие фикстуры для тестов.
+Setup import paths and common fixtures for tests.
 """
 
 import sys
 from pathlib import Path
 
-# Добавляем src в sys.path для корректных импортов
+# Add src to sys.path for correct imports
 project_root = Path(__file__).parent.parent
 src_path = project_root / "src"
 
@@ -20,14 +20,14 @@ import pytest
 @pytest.fixture(autouse=True)
 def clean_state():
     """
-    Автоматическая очистка состояния между тестами.
+    Automatic state cleanup between tests.
 
-    Очищает глобальное состояние бота для изоляции тестов.
+    Cleans bot global state for test isolation.
     """
-    # Очищаем состояние перед тестом
+    # Clean state before test
     yield
 
-    # Очищаем состояние после теста
+    # Clean state after test
     try:
         from assign_bot.bot import CHAT_STATE, PENDING, EXPECT_CONFIG
 
@@ -35,5 +35,5 @@ def clean_state():
         PENDING.clear()
         EXPECT_CONFIG.clear()
     except ImportError:
-        # Если модули не загружены, игнорируем
+        # If modules not loaded, ignore
         pass

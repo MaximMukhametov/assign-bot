@@ -196,7 +196,9 @@ async def cmd_configure(message: Message) -> None:
     user_id = message.from_user.id if message.from_user else 0
     if not _is_admin(user_id):
         try:
-            await message.answer("You don't have permissions to configure participants.")
+            await message.answer(
+                "You don't have permissions to configure participants."
+            )
         except TelegramAPIError:
             pass
         return
@@ -320,7 +322,7 @@ async def cmd_assign(message: Message) -> None:
     chat_id: int = message.chat.id
     state: UserConfig = _get_chat_state(chat_id)
     if not state.usernames:
-            # Use default participants if list is empty
+        # Use default participants if list is empty
         state.usernames = DEFAULT_USERNAMES.copy()
         state.selector.set_collection(state.usernames)
         try:
@@ -353,7 +355,16 @@ async def cmd_assign(message: Message) -> None:
     F.data.startswith("toggle::") | (F.data == "next") | (F.data == "cancel")
 )
 async def handle_toggle(cb: CallbackQuery) -> None:
-    chat_id: int = cb.message.chat.id if cb.message else cb.from_user.id
+    # Check callback received from message
+    if not cb.message:
+        logger.error("Callback received without message context")
+        try:
+            await cb.answer("Error: Invalid callback context", show_alert=True)
+        except TelegramAPIError:
+            pass
+        return
+
+    chat_id: int = cb.message.chat.id
     state: UserConfig = _get_chat_state(chat_id)
     pending: PendingAssign = PENDING.setdefault(chat_id, PendingAssign())
     if cb.data == "cancel":
@@ -419,7 +430,9 @@ async def menu_configure(message: Message) -> None:
     user_id = message.from_user.id if message.from_user else 0
     if not _is_admin(user_id):
         try:
-            await message.answer("You don't have permissions to configure participants.")
+            await message.answer(
+                "You don't have permissions to configure participants."
+            )
         except TelegramAPIError:
             pass
         return
@@ -650,9 +663,7 @@ async def _post_assignment(
             sent: Message = await message.answer(text)
     except TelegramAPIError as exc:
         if is_channel:
-            logger.exception(
-                "Failed to send message to channel %s: %s", chat_id, exc
-            )
+            logger.exception("Failed to send message to channel %s: %s", chat_id, exc)
             try:
                 await message.answer(
                     "Failed to send to channel. Check bot permissions and channel name."

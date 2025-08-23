@@ -300,9 +300,7 @@ class TestRealWorldScenarios:
 
         # Check that no one is skipped for long
         assigned_users = [user for week, user in weekly_assignments if user]
-        assert (
-            len(set(assigned_users)) >= 3
-        )  # Minimum 3 different users in 10 weeks
+        assert len(set(assigned_users)) >= 3  # Minimum 3 different users in 10 weeks
 
     def test_random_task_distribution(self):
         """Test random task distribution."""

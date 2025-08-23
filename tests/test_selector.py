@@ -1,7 +1,7 @@
 """
-Тесты для модуля selector.
+Tests for selector module.
 
-Проверяет корректность работы классов и стратегий выбора элементов.
+Verifies correct operation of classes and strategies for element selection.
 """
 
 import pytest
@@ -17,17 +17,17 @@ from assign_bot.selector import (
 
 
 class TestRandomStrategy:
-    """Тесты для стратегии случайного выбора."""
+    """Tests for random selection strategy."""
 
     def test_empty_collection(self):
-        """Тест случайной стратегии с пустой коллекцией."""
+        """Test random strategy with empty collection."""
         strategy = RandomStrategy[str]()
         selected = strategy.select([], count=3)
 
         assert selected == []
 
     def test_normal_selection(self):
-        """Тест случайной стратегии с обычным выбором."""
+        """Test random strategy with normal selection."""
         strategy = RandomStrategy[str]()
         available = ["a", "b", "c", "d", "e"]
 
@@ -35,20 +35,20 @@ class TestRandomStrategy:
 
         assert len(selected) == 3
         assert all(item in available for item in selected)
-        assert len(set(selected)) == 3  # Без повторений
+        assert len(set(selected)) == 3  # Without repetitions
 
     def test_count_exceeds_available(self):
-        """Тест случайной стратегии когда запрашивается больше элементов, чем доступно."""
+        """Test random strategy when more elements requested than available."""
         strategy = RandomStrategy[str]()
         available = ["a", "b"]
 
         selected = strategy.select(available, count=5)
 
-        assert len(selected) == 2  # Максимум доступных
+        assert len(selected) == 2  # Maximum available
         assert set(selected) == {"a", "b"}
 
     def test_state_independence(self):
-        """Тест что random стратегия не зависит от состояния и reset ничего не ломает."""
+        """Test that random strategy doesn't depend on state and reset doesn't break anything."""
         strategy = RandomStrategy[str]()
         available = ["a", "b", "c"]
 
@@ -66,17 +66,17 @@ class TestRandomStrategy:
 
 
 class TestRoundRobinStrategy:
-    """Тесты для стратегии round-robin выбора."""
+    """Tests for round-robin selection strategy."""
 
     def test_empty_collection(self):
-        """Тест round-robin стратегии с пустой коллекцией."""
+        """Test round-robin strategy with empty collection."""
         strategy = RoundRobinStrategy[str]()
         selected = strategy.select([], count=1)
 
         assert selected == []
 
     def test_initial_state(self):
-        """Тест round-robin стратегии с начальным состоянием."""
+        """Test round-robin strategy with initial state."""
         strategy = RoundRobinStrategy[str]()
         full_collection = ["a", "b", "c"]
         available = ["a", "b", "c"]
@@ -85,38 +85,38 @@ class TestRoundRobinStrategy:
 
         assert len(selected) == 1
         assert selected[0] in available
-        assert selected == ["a"]  # Первый элемент коллекции
+        assert selected == ["a"]  # First element of collection
 
     def test_sequential_selections(self):
-        """Тест последовательных выборов round-robin."""
+        """Test sequential round-robin selections."""
         strategy = RoundRobinStrategy[str]()
         full_collection = ["a", "b", "c"]
         available = ["a", "b", "c"]
 
         selections = []
 
-        for _ in range(6):  # 2 полных цикла
+        for _ in range(6):  # 2 full cycles
             selected = strategy.select(
                 available, count=1, full_collection=full_collection
             )
             selections.extend(selected)
 
-        # Проверяем цикличность
+        # Check cyclicity
         assert selections == ["a", "b", "c", "a", "b", "c"]
 
     def test_multiple_count(self):
-        """Тест round-robin с запросом нескольких элементов."""
+        """Test round-robin with requesting multiple elements."""
         strategy = RoundRobinStrategy[str]()
         full_collection = ["a", "b", "c"]
         available = ["a", "b", "c"]
 
         selected = strategy.select(available, count=3, full_collection=full_collection)
 
-        assert len(selected) == 3  # Round-robin возвращает запрошенное количество
-        assert selected == ["a", "b", "c"]  # Последовательный выбор
+        assert len(selected) == 3  # Round-robin returns requested count
+        assert selected == ["a", "b", "c"]  # Sequential selection
 
     def test_partial_count(self):
-        """Тест round-robin с запросом части элементов."""
+        """Test round-robin with requesting part of elements."""
         strategy = RoundRobinStrategy[str]()
         full_collection = ["a", "b", "c", "d"]
         available = ["a", "b", "c", "d"]
@@ -124,10 +124,10 @@ class TestRoundRobinStrategy:
         selected = strategy.select(available, count=2, full_collection=full_collection)
 
         assert len(selected) == 2
-        assert selected == ["a", "b"]  # Первые два элемента
+        assert selected == ["a", "b"]  # First two elements
 
     def test_partial_available_selection(self):
-        """Тест round-robin с частично доступными элементами."""
+        """Test round-robin with partially available elements."""
         strategy = RoundRobinStrategy[str]()
         full_collection = ["a", "b", "c", "d", "e"]
         available = ["a", "c", "e"]  # Пропускаем b и d
@@ -148,7 +148,7 @@ class TestRoundRobinStrategy:
         assert set(selections) == set(available)
 
     def test_requires_full_collection(self):
-        """Тест что round-robin требует full_collection."""
+        """Test that round-robin requires full_collection."""
         strategy = RoundRobinStrategy[str]()
         available = ["a", "b", "c"]
 
@@ -156,7 +156,7 @@ class TestRoundRobinStrategy:
             strategy.select(available, count=1)
 
     def test_state_persistence_with_partial_available(self):
-        """Тест сохранения состояния при работе с частичными списками."""
+        """Test state preservation when working with partial lists."""
         strategy = RoundRobinStrategy[str]()
         full_collection = ["alice", "bob", "charlie", "david"]
 
@@ -184,7 +184,7 @@ class TestRoundRobinStrategy:
         assert selected3 == ["david"]
 
     def test_reset_state(self):
-        """Тест сброса состояния стратегии."""
+        """Test strategy state reset."""
         strategy = RoundRobinStrategy[str]()
         full_collection = ["a", "b", "c"]
         available = ["a", "b", "c"]
@@ -207,29 +207,29 @@ class TestRoundRobinStrategy:
 
 
 class TestItemSelector:
-    """Тесты для класса ItemSelector."""
+    """Tests for ItemSelector class."""
 
     @pytest.fixture
     def sample_users(self) -> List[str]:
-        """Фикстура с примером пользователей."""
+        """Fixture with example users."""
         return ["@alice", "@bob", "@charlie", "@david", "@eve"]
 
     def test_selector_initialization(self):
-        """Тест инициализации селектора."""
+        """Test selector initialization."""
         selector = ItemSelector[str]()
 
         assert selector.collection == []
         assert selector.policy == SelectionPolicy.RANDOM
 
     def test_selector_set_collection(self, sample_users):
-        """Тест установки коллекции."""
+        """Test setting collection."""
         selector = ItemSelector[str]()
         selector.set_collection(sample_users)
 
         assert selector.collection == sample_users
 
     def test_selector_set_policy(self):
-        """Тест изменения политики."""
+        """Test policy change."""
         selector = ItemSelector[str]()
         selector.set_collection(["a", "b", "c"])
 
@@ -246,7 +246,7 @@ class TestItemSelector:
         assert result1 != result2  # Round-robin даёт разные результаты
 
     def test_selector_set_same_policy(self):
-        """Тест установки той же политики (оптимизация - не пересоздаём стратегию)."""
+        """Test setting same policy (optimization - don't recreate strategy)."""
         selector = ItemSelector[str]()
         selector.set_collection(["a", "b", "c"])
 
@@ -261,7 +261,7 @@ class TestItemSelector:
         assert selector._strategy is original_strategy  # Та же самая стратегия
 
     def test_selector_random_selection(self, sample_users):
-        """Тест случайного выбора через селектор."""
+        """Test random selection through selector."""
         selector = ItemSelector[str]()
         selector.set_collection(sample_users)
         selector.set_policy(SelectionPolicy.RANDOM)
@@ -270,25 +270,25 @@ class TestItemSelector:
 
         assert len(selected) == 3
         assert all(user in sample_users for user in selected)
-        assert len(set(selected)) == 3  # Без повторений
+        assert len(set(selected)) == 3  # Without repetitions
 
     def test_selector_round_robin_selection(self, sample_users):
-        """Тест round-robin выбора через селектор."""
+        """Test round-robin selection through selector."""
         selector = ItemSelector[str]()
         selector.set_collection(sample_users)
         selector.set_policy(SelectionPolicy.ROUND_ROBIN)
 
         selections = []
-        for _ in range(len(sample_users) * 2):  # 2 полных цикла
+        for _ in range(len(sample_users) * 2):  # 2 full cycles
             selected = selector.select(count=1)
             selections.extend(selected)
 
-        # Проверяем цикличность
+        # Check cyclicity
         expected = sample_users * 2
         assert selections == expected
 
     def test_selector_select_from_available_valid(self, sample_users):
-        """Тест выбора из подмножества доступных."""
+        """Test selection from subset of available."""
         selector = ItemSelector[str]()
         selector.set_collection(sample_users)
 
@@ -299,7 +299,7 @@ class TestItemSelector:
         assert all(user in available for user in selected)
 
     def test_selector_select_from_available_invalid(self, sample_users):
-        """Тест выбора из подмножества с элементами не из коллекции."""
+        """Test selection from subset with elements not from collection."""
         selector = ItemSelector[str]()
         selector.set_collection(sample_users)
 
@@ -309,7 +309,7 @@ class TestItemSelector:
             selector.select_from_available(available, count=1)
 
     def test_selector_select_from_empty_available(self, sample_users):
-        """Тест выбора из пустого подмножества."""
+        """Test selection from empty subset."""
         selector = ItemSelector[str]()
         selector.set_collection(sample_users)
 
@@ -318,7 +318,7 @@ class TestItemSelector:
         assert selected == []
 
     def test_selector_select_empty_collection(self):
-        """Тест выбора из пустой коллекции."""
+        """Test selection from empty collection."""
         selector = ItemSelector[str]()
 
         selected = selector.select(count=5)
@@ -326,7 +326,7 @@ class TestItemSelector:
         assert selected == []
 
     def test_selector_reset_state(self, sample_users):
-        """Тест сброса состояния."""
+        """Test state reset."""
         selector = ItemSelector[str]()
         selector.set_collection(sample_users)
         selector.set_policy(SelectionPolicy.ROUND_ROBIN)
@@ -343,7 +343,7 @@ class TestItemSelector:
         assert result3 == result1  # Начинает сначала
 
     def test_selector_get_info(self, sample_users):
-        """Тест получения информации о селекторе."""
+        """Test getting selector information."""
         selector = ItemSelector[str]()
         selector.set_collection(sample_users)
         selector.set_policy(SelectionPolicy.ROUND_ROBIN)
@@ -355,7 +355,7 @@ class TestItemSelector:
         assert len(info) == 2  # Только размер коллекции и политика
 
     def test_selector_unsupported_policy(self):
-        """Тест неподдерживаемой политики."""
+        """Test unsupported policy."""
         selector = ItemSelector[str]()
 
         # Напрямую устанавливаем недопустимую политику
@@ -366,10 +366,10 @@ class TestItemSelector:
 
 
 class TestIntegrationScenarios:
-    """Интеграционные тесты реальных сценариев использования."""
+    """Integration tests for real usage scenarios."""
 
     def test_telegram_bot_scenario(self):
-        """Тест сценария использования в Telegram боте."""
+        """Test Telegram bot usage scenario."""
         # Инициализация как в боте
         all_participants = ["@alice", "@bob", "@charlie", "@david", "@eve"]
         selector = ItemSelector[str]()
@@ -384,7 +384,7 @@ class TestIntegrationScenarios:
         assigned3 = selector.select_from_available(active_today, count=1)
         assigned4 = selector.select_from_available(active_today, count=1)
 
-        # Проверяем цикличность в рамках активных
+        # Check cyclicity в рамках активных
         all_assigned = [assigned1[0], assigned2[0], assigned3[0], assigned4[0]]
         assert len(set(all_assigned)) <= len(active_today)
 
@@ -396,7 +396,7 @@ class TestIntegrationScenarios:
         assert all(user in active_today for user in assigned_random)
 
     def test_state_persistence_across_selections(self):
-        """Тест сохранения состояния между выборами."""
+        """Test state preservation between selections."""
         users = ["@user1", "@user2", "@user3"]
         selector = ItemSelector[str]()
         selector.set_collection(users)
@@ -409,12 +409,12 @@ class TestIntegrationScenarios:
             results.extend(selected)
 
         # Проверяем, что состояние корректно сохранялось
-        expected = users * 2  # 2 полных цикла
+        expected = users * 2  # 2 full cycles
         assert results == expected
 
     @patch("assign_bot.selector.random.sample")
     def test_random_selection_deterministic(self, mock_sample):
-        """Тест детерминированного поведения random выбора (для предсказуемых тестов)."""
+        """Test deterministic random selection behavior (for predictable tests)."""
         mock_sample.return_value = ["@bob", "@alice"]
 
         selector = ItemSelector[str]()
@@ -436,7 +436,7 @@ class TestIntegrationScenarios:
     ],
 )
 def test_policy_specific_behavior(policy, count, expected_count):
-    """Параметризованный тест поведения разных политик."""
+    """Parameterized test of different policies behavior."""
     users = ["@user1", "@user2", "@user3", "@user4"]
     selector = ItemSelector[str]()
     selector.set_collection(users)

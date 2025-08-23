@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 router = Router(name="assign_bot")
 
 
-# Список участников по умолчанию, если пользователь ещё не задал свой
+# Default participants list if user hasn't set their own yet
 DEFAULT_USERNAMES: List[str] = [
     "@MaksimMukhametov",
     "@jellex",
@@ -37,80 +37,80 @@ DEFAULT_USERNAMES: List[str] = [
 
 def _parse_admin_user_ids() -> Set[int]:
     """
-    Парсит ID администраторов из переменной окружения ADMIN_USER_ID.
+    Parses admin IDs from ADMIN_USER_ID environment variable.
 
-    Поддерживаемые форматы:
-    - Один ID: "12345678"
-    - Несколько ID через запятую: "12345678,87654321,11111111"
-    - Несколько ID через пробелы: "12345678 87654321 11111111"
+    Supported formats:
+    - Single ID: "12345678"
+    - Multiple IDs with commas: "12345678,87654321,11111111"
+    - Multiple IDs with spaces: "12345678 87654321 11111111"
 
     Returns:
-        Множество ID администраторов
+        Set of admin IDs
     """
     admin_ids_str = os.getenv("ADMIN_USER_ID", "").strip()
 
     if not admin_ids_str:
         logger.warning(
-            "ADMIN_USER_ID не задан в переменных окружения. Администраторов не будет."
+            "ADMIN_USER_ID not set in environment variables. No administrators will be configured."
         )
         return set()
 
     try:
-        # Поддерживаем разделители: запятая и пробел
+        # Support delimiters: comma and space
         admin_ids_str = admin_ids_str.replace(",", " ")
         admin_ids = {
             int(id_str.strip()) for id_str in admin_ids_str.split() if id_str.strip()
         }
 
-        logger.info(f"Загружено {len(admin_ids)} администратора(ов) из ADMIN_USER_ID")
+        logger.info(f"Loaded {len(admin_ids)} administrator(s) from ADMIN_USER_ID")
         return admin_ids
 
     except ValueError as e:
         logger.error(
-            f"Ошибка парсинга ADMIN_USER_ID: {e}. Проверьте формат в .env файле."
+            f"Error parsing ADMIN_USER_ID: {e}. Check the format in .env file."
         )
         return set()
 
 
 def _parse_assign_channel_id() -> Optional[str]:
     """
-    Парсит ID канала для отправки назначений из переменной окружения ASSIGN_CHANNEL_ID.
+    Parses channel ID for sending assignments from ASSIGN_CHANNEL_ID environment variable.
 
-    Поддерживаемые форматы:
-    - Числовой ID: "-1001234567890"
-    - Username канала: "@mychannel"
-    - Username канала без @: "mychannel"
+    Supported formats:
+    - Numeric ID: "-1001234567890"
+    - Channel username: "@mychannel"
+    - Channel username without @: "mychannel"
 
     Returns:
-        ID канала или None если не задан
+        Channel ID or None if not set
     """
     channel_id = os.getenv("ASSIGN_CHANNEL_ID", "").strip()
 
     if not channel_id:
         logger.warning(
-            "ASSIGN_CHANNEL_ID не задан в переменных окружения. Назначения отправляться не будут."
+            "ASSIGN_CHANNEL_ID not set in environment variables. Assignments will not be sent."
         )
         return None
 
-    # Если это числовой ID, оставляем как есть
+    # If it's a numeric ID, leave as is
     if channel_id.lstrip("-").isdigit():
-        logger.info(f"Загружен числовой ID канала: {channel_id}")
+        logger.info(f"Loaded numeric channel ID: {channel_id}")
         return channel_id
 
-    # Если username без @, добавляем @
+    # If username without @, add @
     if not channel_id.startswith("@"):
         channel_id = f"@{channel_id}"
 
-    logger.info(f"Загружен username канала: {channel_id}")
+    logger.info(f"Loaded channel username: {channel_id}")
     return channel_id
 
 
-# ID администраторов, которые могут настраивать участников
-# Загружается из переменной окружения ADMIN_USER_ID
+# Admin IDs that can configure participants
+# Loaded from ADMIN_USER_ID environment variable
 ADMIN_USER_IDS: Set[int] = _parse_admin_user_ids()
 
-# ID канала для отправки назначений
-# Загружается из переменной окружения ASSIGN_CHANNEL_ID
+# Channel ID for sending assignments
+# Loaded from ASSIGN_CHANNEL_ID environment variable
 ASSIGN_CHANNEL_ID: Optional[str] = _parse_assign_channel_id()
 
 
@@ -129,7 +129,7 @@ EXPECT_CONFIG: Set[int] = set()
 class PendingAssign:
     active_selected: Set[str] = field(default_factory=set)
     policy: Optional[SelectionPolicy] = None
-    count: Optional[int] = None  # количество участников для назначения (1, 2 или 3)
+    count: Optional[int] = None  # number of participants for assignment (1, 2 or 3)
     description: str = ""
     message_id_with_keyboard: Optional[int] = None
     step: Optional[str] = None  # 'configure' | 'await_count' | 'await_description'
@@ -145,7 +145,7 @@ def _get_chat_state(chat_id: int) -> UserConfig:
 
 
 def _is_admin(user_id: int) -> bool:
-    """Проверяет, является ли пользователь администратором."""
+    """Checks if user is an administrator."""
     return user_id in ADMIN_USER_IDS
 
 
@@ -176,27 +176,27 @@ async def cmd_start(message: Message) -> None:
     is_admin = _is_admin(user_id)
 
     try:
-        commands_text = "Доступные команды:\n"
+        commands_text = "Available commands:\n"
         if is_admin:
-            commands_text += "/configure — задать список участников (@usernames)\n"
-        commands_text += "/assign — выбрать активных и выполнить назначение\n"
-        commands_text += "/myid — показать ваш User ID"
+            commands_text += "/configure — set participants list (@usernames)\n"
+        commands_text += "/assign — select active participants and perform assignment\n"
+        commands_text += "/myid — show your User ID"
 
         await message.answer(
-            f"Привет! Я Assign Bot.\n\n{commands_text}",
+            f"Hello! I'm Assign Bot.\n\n{commands_text}",
             reply_markup=_main_menu_keyboard(is_admin=is_admin),
         )
     except TelegramAPIError as exc:
-        logger.exception("Не удалось отправить ответ на /start: %s", exc)
+        logger.exception("Failed to send reply to /start: %s", exc)
 
 
 @router.message(Command("configure"))
 async def cmd_configure(message: Message) -> None:
-    # Проверяем права администратора
+    # Check admin rights
     user_id = message.from_user.id if message.from_user else 0
     if not _is_admin(user_id):
         try:
-            await message.answer("У вас нет прав для настройки участников.")
+            await message.answer("You don't have permissions to configure participants.")
         except TelegramAPIError:
             pass
         return
@@ -207,14 +207,14 @@ async def cmd_configure(message: Message) -> None:
 
     try:
         await message.answer(
-            "Отправьте список участников через пробел/запятую/перенос строки.\n"
-            "Пример: @alice, @bob, @carol",
+            "Send participants list separated by space/comma/newline.\n"
+            "Example: @alice, @bob, @carol",
             reply_markup=_main_menu_keyboard(is_admin=is_admin),
         )
     except TelegramAPIError as exc:
-        logger.exception("Ошибка при запросе конфигурации: %s", exc)
+        logger.exception("Error requesting configuration: %s", exc)
         return
-    # Следующее текстовое сообщение — конфигурация участников
+    # Next text message will be participants configuration
     EXPECT_CONFIG.add(chat_id)
 
 
@@ -228,28 +228,28 @@ async def handle_config_input(message: Message) -> None:
     if not usernames:
         try:
             await message.answer(
-                "Не удалось распознать ни одного пользователя. Попробуйте ещё раз командой /configure."
+                "Could not recognize any users. Please try again with /configure command."
             )
         except TelegramAPIError:
             pass
         return
     state.usernames = usernames
-    # Обновляем селектор с новой коллекцией участников
+    # Update selector with new participants collection
     state.selector.set_collection(usernames)
     try:
         await message.answer(
-            "Список участников сохранён:\n" + _format_user_list(state.usernames),
+            "Participants list saved:\n" + _format_user_list(state.usernames),
             reply_markup=_main_menu_keyboard(is_admin=is_admin),
         )
     except TelegramAPIError as exc:
-        logger.exception("Не удалось отправить подтверждение конфигурации: %s", exc)
+        logger.exception("Failed to send configuration confirmation: %s", exc)
 
 
 def _main_menu_keyboard(is_admin: bool = False) -> ReplyKeyboardMarkup:
-    """Создаёт клавиатуру главного меню.
+    """Creates main menu keyboard.
 
     Args:
-        is_admin: Если True, показывает кнопку Configure Participants
+        is_admin: If True, shows Configure Participants button
     """
     buttons = []
     if is_admin:
@@ -281,21 +281,21 @@ def _build_toggle_keyboard(
     # control row
     rows.append(
         [
-            InlineKeyboardButton(text="Далее ▶️", callback_data="next"),
-            InlineKeyboardButton(text="Отмена", callback_data="cancel"),
+            InlineKeyboardButton(text="Next ▶️", callback_data="next"),
+            InlineKeyboardButton(text="Cancel", callback_data="cancel"),
         ]
     )
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def _build_count_keyboard() -> InlineKeyboardMarkup:
-    """Создаёт клавиатуру для выбора количества участников для назначения."""
+    """Creates keyboard for selecting number of participants for assignment."""
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="1️⃣ участник", callback_data="count::1"),
-                InlineKeyboardButton(text="2️⃣ участника", callback_data="count::2"),
-                InlineKeyboardButton(text="3️⃣ участника", callback_data="count::3"),
+                InlineKeyboardButton(text="1️⃣ participant", callback_data="count::1"),
+                InlineKeyboardButton(text="2️⃣ participants", callback_data="count::2"),
+                InlineKeyboardButton(text="3️⃣ participants", callback_data="count::3"),
             ]
         ]
     )
@@ -305,14 +305,14 @@ def _build_count_keyboard() -> InlineKeyboardMarkup:
 async def assign_help(cb: CallbackQuery) -> None:
     try:
         await cb.message.answer(
-            "После команды /assign отправьте список активных участников, которых нужно включить в назначение.\n"
-            "Пример: @alice, @bob\n\n"
-            "Политика выбора: укажите 'round' или 'random' и описание.\n"
-            "Пример: round Еженедельная дежурка по поддержке"
+            "After /assign command send list of active participants to include in assignment.\n"
+            "Example: @alice, @bob\n\n"
+            "Selection policy: specify 'round' or 'random' and description.\n"
+            "Example: round Weekly support duty"
         )
         await cb.answer()
     except TelegramAPIError as exc:
-        logger.exception("Ошибка в assign_help: %s", exc)
+        logger.exception("Error in assign_help: %s", exc)
 
 
 @router.message(Command("assign"))
@@ -320,12 +320,12 @@ async def cmd_assign(message: Message) -> None:
     chat_id: int = message.chat.id
     state: UserConfig = _get_chat_state(chat_id)
     if not state.usernames:
-        # Используем дефолтных участников, если список пуст
+            # Use default participants if list is empty
         state.usernames = DEFAULT_USERNAMES.copy()
         state.selector.set_collection(state.usernames)
         try:
             await message.answer(
-                "Список участников не был задан. Использую участников по умолчанию:\n"
+                "Participants list was not set. Using default participants:\n"
                 + _format_user_list(state.usernames)
             )
         except TelegramAPIError:
@@ -338,14 +338,14 @@ async def cmd_assign(message: Message) -> None:
     pending.step = "configure"
     try:
         sent: Message = await message.answer(
-            "Выберите активных участников на этот раунд:",
+            "Select active participants for this round:",
             reply_markup=_build_toggle_keyboard(
                 state.usernames, pending.active_selected
             ),
         )
         pending.message_id_with_keyboard = sent.message_id
     except TelegramAPIError as exc:
-        logger.exception("Ошибка при старте выбора активных: %s", exc)
+        logger.exception("Error starting active selection: %s", exc)
         return
 
 
@@ -359,7 +359,7 @@ async def handle_toggle(cb: CallbackQuery) -> None:
     if cb.data == "cancel":
         PENDING.pop(chat_id, None)
         try:
-            await cb.message.edit_text("Операция отменена.")
+            await cb.message.edit_text("Operation cancelled.")
             await cb.answer()
         except TelegramAPIError:
             pass
@@ -367,7 +367,7 @@ async def handle_toggle(cb: CallbackQuery) -> None:
     if cb.data == "next":
         if not pending.active_selected:
             try:
-                await cb.answer("Выберите хотя бы одного участника", show_alert=True)
+                await cb.answer("Select at least one participant", show_alert=True)
             except TelegramAPIError:
                 pass
             return
@@ -375,7 +375,7 @@ async def handle_toggle(cb: CallbackQuery) -> None:
         pending.step = "policy"
         try:
             await cb.message.edit_text(
-                "Выберите политику назначения:",
+                "Select assignment policy:",
                 reply_markup=InlineKeyboardMarkup(
                     inline_keyboard=[
                         [
@@ -391,7 +391,7 @@ async def handle_toggle(cb: CallbackQuery) -> None:
             )
             await cb.answer()
         except TelegramAPIError as exc:
-            logger.exception("Ошибка при выборе политики: %s", exc)
+            logger.exception("Error in policy selection: %s", exc)
         return
 
     # toggle::<username>
@@ -410,16 +410,16 @@ async def handle_toggle(cb: CallbackQuery) -> None:
         )
         await cb.answer()
     except TelegramAPIError as exc:
-        logger.exception("Ошибка обновления клавиатуры выбора: %s", exc)
+        logger.exception("Error updating selection keyboard: %s", exc)
 
 
 @router.message(F.text == "Configure Participants")
 async def menu_configure(message: Message) -> None:
-    # Проверяем права администратора (дублируем проверку из cmd_configure для безопасности)
+    # Check admin rights (duplicate check from cmd_configure for security)
     user_id = message.from_user.id if message.from_user else 0
     if not _is_admin(user_id):
         try:
-            await message.answer("У вас нет прав для настройки участников.")
+            await message.answer("You don't have permissions to configure participants.")
         except TelegramAPIError:
             pass
         return
@@ -433,23 +433,23 @@ async def menu_assign(message: Message) -> None:
 
 @router.message(Command("myid"))
 async def cmd_myid(message: Message) -> None:
-    """Показывает User ID пользователя для настройки админов."""
+    """Shows user's User ID for admin configuration."""
     user_id = message.from_user.id if message.from_user else 0
-    username = message.from_user.username if message.from_user else "неизвестно"
+    username = message.from_user.username if message.from_user else "unknown"
     is_admin = _is_admin(user_id)
 
-    admin_status = "✅ Администратор" if is_admin else "❌ Обычный пользователь"
+    admin_status = "✅ Administrator" if is_admin else "❌ Regular user"
 
     try:
         await message.answer(
-            f"Ваш User ID: `{user_id}`\n"
+            f"Your User ID: `{user_id}`\n"
             f"Username: @{username}\n"
-            f"Статус: {admin_status}\n\n"
-            f"Для добавления в админы добавьте ID в переменную окружения ADMIN_USER_ID в .env файле.",
+            f"Status: {admin_status}\n\n"
+            f"To add as admin, add ID to ADMIN_USER_ID environment variable in .env file.",
             parse_mode="Markdown",
         )
     except TelegramAPIError as exc:
-        logger.exception("Ошибка при отправке ID: %s", exc)
+        logger.exception("Error sending ID: %s", exc)
 
 
 @router.callback_query(F.data.startswith("policy::"))
@@ -463,26 +463,26 @@ async def handle_policy(cb: CallbackQuery) -> None:
         pending.policy = SelectionPolicy.RANDOM
     else:
         try:
-            await cb.answer("Неизвестная политика", show_alert=True)
+            await cb.answer("Unknown policy", show_alert=True)
         except TelegramAPIError:
             pass
         return
     pending.step = "await_count"
     try:
         await cb.message.edit_text(
-            "Выберите количество участников для назначения:",
+            "Select number of participants for assignment:",
             reply_markup=_build_count_keyboard(),
         )
         await cb.answer()
     except TelegramAPIError as exc:
-        logger.exception("Ошибка на шаге выбора количества: %s", exc)
+        logger.exception("Error at count selection step: %s", exc)
         return
-    # Следующий callback — выбор количества участников
+    # Next callback - selecting number of participants
 
 
 @router.callback_query(F.data.startswith("count::"))
 async def handle_count(cb: CallbackQuery) -> None:
-    """Обрабатывает выбор количества участников для назначения."""
+    """Handles selection of number of participants for assignment."""
     chat_id: int = cb.message.chat.id
     pending: PendingAssign = PENDING.setdefault(chat_id, PendingAssign())
 
@@ -494,17 +494,17 @@ async def handle_count(cb: CallbackQuery) -> None:
         pending.count = count
     except ValueError:
         try:
-            await cb.answer("Неизвестное количество участников", show_alert=True)
+            await cb.answer("Unknown number of participants", show_alert=True)
         except TelegramAPIError:
             pass
         return
 
     pending.step = "await_description"
     try:
-        await cb.message.edit_text("Введите описание задачи (произвольный текст)")
+        await cb.message.edit_text("Enter task description (any text)")
         await cb.answer()
     except TelegramAPIError as exc:
-        logger.exception("Ошибка на шаге описания: %s", exc)
+        logger.exception("Error at description step: %s", exc)
         return
 
 
@@ -517,53 +517,53 @@ async def handle_description_input(message: Message) -> None:
 
     pending.description = message.text or ""
 
-    # Проверяем что канал сконфигурирован
+    # Check that channel is configured
     if not ASSIGN_CHANNEL_ID:
         try:
             await message.answer(
-                "❌ Канал для назначений не сконфигурирован.\n"
-                "Обратитесь к администратору для настройки ASSIGN_CHANNEL_ID.",
+                "❌ Assignment channel not configured.\n"
+                "Contact administrator to configure ASSIGN_CHANNEL_ID.",
                 reply_markup=_main_menu_keyboard(is_admin=is_admin),
             )
         except TelegramAPIError:
             pass
-        # Очищаем состояние
+        # Clear state
         PENDING.pop(chat_id, None)
         return
 
-    # Выбираем участников и отправляем назначение
+    # Select participants and send assignment
     assignees: List[str] = _select_assignees(
         pending.policy or SelectionPolicy.ROUND_ROBIN,
         list(pending.active_selected),
         state,
-        pending.count or 1,  # Используем выбранное количество или 1 по умолчанию
+        pending.count or 1,  # Use selected count or 1 by default
     )
     await _post_assignment(
         message, assignees, pending.description, target_chat=ASSIGN_CHANNEL_ID
     )
 
-    # Очищаем состояние
+    # Clear state
     PENDING.pop(chat_id, None)
 
 
 @router.message(F.text)
 async def handle_text_steps(message: Message) -> None:
-    """Единая точка обработки последовательных текстовых шагов.
+    """Single point for handling sequential text steps.
 
-    - Ожидание конфигурации участников после /configure
-    - Ожидание описания после выбора политики
+    - Waiting for participants configuration after /configure
+    - Waiting for description after policy selection
     """
     chat_id: int = message.chat.id
-    # текст используется в хендлерах ниже по шагам
+    # text is used in handlers below by steps
 
-    # 1) Конфигурация участников
+    # 1) Participants configuration
     if chat_id in EXPECT_CONFIG:
-        # Выполнить конфигурацию и очистить флаг ожидания
+        # Execute configuration and clear waiting flag
         await handle_config_input(message)
         EXPECT_CONFIG.discard(chat_id)
         return
 
-    # 2) Шаги назначения
+    # 2) Assignment steps
     pending: Optional[PendingAssign] = PENDING.get(chat_id)
     if not pending:
         return
@@ -576,32 +576,32 @@ def _select_assignees(
     policy: SelectionPolicy, active: Sequence[str], state: UserConfig, count: int
 ) -> List[str]:
     """
-    Выбирает участников для назначения используя ItemSelector.
+    Selects participants for assignment using ItemSelector.
 
     Args:
-        policy: Политика выбора
-        active: Список активных участников (подмножество от state.usernames)
-        state: Конфигурация пользователя с селектором
-        count: Количество участников для выбора (1, 2 или 3)
+        policy: Selection policy
+        active: List of active participants (subset of state.usernames)
+        state: User configuration with selector
+        count: Number of participants to select (1, 2 or 3)
 
     Returns:
-        Список выбранных участников
+        List of selected participants
     """
     if not active:
         return []
 
-    # Проверяем, что count не превышает количество активных участников
+    # Check that count doesn't exceed number of active participants
     actual_count = min(count, len(active))
 
-    # Устанавливаем политику и выбираем из активных участников
+    # Set policy and select from active participants
     state.selector.set_policy(policy)
 
     try:
         selected = state.selector.select_from_available(active, actual_count)
         return selected
     except ValueError:
-        # Если возникла ошибка (например, active содержит элементы не из коллекции),
-        # фильтруем active только до валидных пользователей и пробуем снова
+        # If error occurred (e.g., active contains elements not from collection),
+        # filter active to only valid users and try again
         valid_active = [user for user in active if user in state.usernames]
         if not valid_active:
             return []
@@ -618,31 +618,31 @@ async def _post_assignment(
     target_chat: Optional[str] = None,
 ) -> None:
     """
-    Отправляет сообщение о назначении с @mentions и poll для отметки выполнения.
+    Sends assignment message with @mentions and poll for completion tracking.
 
     Args:
-        message: Исходное сообщение
-        assignees: Список назначенных пользователей
-        description: Описание задачи
-        target_chat: Целевой чат/канал. Если None, отправляется в текущий чат
+        message: Original message
+        assignees: List of assigned users
+        description: Task description
+        target_chat: Target chat/channel. If None, sends to current chat
     """
     if not assignees:
         try:
-            await message.answer("Некого назначать — список пуст.")
+            await message.answer("No one to assign — list is empty.")
         except TelegramAPIError:
             pass
         return
 
-    # Определяем куда отправлять и настройки анонимности
+    # Determine where to send and anonymity settings
     is_channel = target_chat is not None
     chat_id = target_chat if is_channel else message.chat.id
-    is_anonymous = is_channel  # Каналы требуют анонимные опросы
+    is_anonymous = is_channel  # Channels require anonymous polls
 
-    # Формируем текстовое сообщение с @mentions для уведомлений
+    # Form text message with @mentions for notifications
     assignees_text: str = ", ".join(assignees)
-    text: str = f"Назначены: {assignees_text}\n{description}".strip()
+    text: str = f"Assigned: {assignees_text}\n{description}".strip()
 
-    # Отправляем текстовое сообщение с @mentions
+    # Send text message with @mentions
     try:
         if is_channel:
             sent: Message = await message.bot.send_message(chat_id=chat_id, text=text)
@@ -651,31 +651,31 @@ async def _post_assignment(
     except TelegramAPIError as exc:
         if is_channel:
             logger.exception(
-                "Не удалось отправить сообщение в канал %s: %s", chat_id, exc
+                "Failed to send message to channel %s: %s", chat_id, exc
             )
             try:
                 await message.answer(
-                    "Не удалось отправить в канал. Проверьте права бота и имя канала."
+                    "Failed to send to channel. Check bot permissions and channel name."
                 )
             except TelegramAPIError:
                 pass
         else:
-            logger.exception("Ошибка при отправке сообщения о назначении: %s", exc)
+            logger.exception("Error sending assignment message: %s", exc)
         return
 
-    # Создаем poll для отметки выполнения
+    # Create poll for completion tracking
     try:
         # Create poll options with assigned users' names
         poll_options = [f"✔️ {assignee}" for assignee in assignees]
 
         await message.bot.send_poll(
             chat_id=chat_id,
-            question="Отметьте выполнение:",
+            question="Mark completion:",
             options=poll_options,
             is_anonymous=is_anonymous,
             allows_multiple_answers=True,
-            reply_to_message_id=sent.message_id,  # Связываем poll с текстовым сообщением
+            reply_to_message_id=sent.message_id,  # Link poll to text message
         )
     except TelegramAPIError as exc:
-        error_context = "в канале" if is_channel else ""
-        logger.exception("Не удалось создать опрос %s: %s", error_context, exc)
+        error_context = "in channel" if is_channel else ""
+        logger.exception("Failed to create poll %s: %s", error_context, exc)

@@ -1,7 +1,7 @@
 """
-Интеграционные тесты для бота с использованием нового модуля selector.
+Integration tests for bot using new selector module.
 
-Проверяет корректность интеграции селектора в логику бота.
+Verifies correct integration of selector into bot logic.
 """
 
 import pytest
@@ -19,10 +19,10 @@ from assign_bot.selector import SelectionPolicy
 
 
 class TestUserConfig:
-    """Тесты для класса UserConfig с селектором."""
+    """Tests for UserConfig class with selector."""
 
     def test_user_config_initialization(self):
-        """Тест инициализации конфигурации пользователя."""
+        """Test user configuration initialization."""
         config = UserConfig()
 
         assert config.usernames == []
@@ -30,7 +30,7 @@ class TestUserConfig:
         assert config.selector.policy == SelectionPolicy.RANDOM
 
     def test_user_config_with_usernames(self):
-        """Тест конфигурации с начальными пользователями."""
+        """Test configuration with initial users."""
         usernames = ["@alice", "@bob", "@charlie"]
         config = UserConfig()
         config.usernames = usernames
@@ -41,11 +41,11 @@ class TestUserConfig:
 
 
 class TestSelectAssignees:
-    """Тесты для функции _select_assignees."""
+    """Tests for _select_assignees function."""
 
     @pytest.fixture
     def mock_state(self) -> UserConfig:
-        """Фикстура с мок-состоянием."""
+        """Fixture with mock state."""
         state = UserConfig()
         usernames = ["@alice", "@bob", "@charlie", "@david"]
         state.usernames = usernames
@@ -53,93 +53,93 @@ class TestSelectAssignees:
         return state
 
     def test_select_assignees_empty_active(self, mock_state):
-        """Тест выбора с пустым списком активных."""
+        """Test selection with empty active list."""
         result = _select_assignees(SelectionPolicy.RANDOM, [], mock_state, 2)
 
         assert result == []
 
     def test_select_assignees_random_policy(self, mock_state):
-        """Тест выбора с политикой RANDOM."""
+        """Test selection with RANDOM policy."""
         active = ["@alice", "@charlie"]
 
         result = _select_assignees(SelectionPolicy.RANDOM, active, mock_state, 2)
 
-        # Для команды из 2 человек выбираем 2
+        # For 2-person team select 2
         assert len(result) == 2
         assert all(user in active for user in result)
         assert mock_state.selector.policy == SelectionPolicy.RANDOM
 
     def test_select_assignees_random_policy_large_team(self, mock_state):
-        """Тест выбора с политикой RANDOM для большой команды."""
-        active = ["@alice", "@bob", "@charlie"]  # >= 2 человек
+        """Test selection with RANDOM policy for large team."""
+        active = ["@alice", "@bob", "@charlie"]  # >= 2 people
 
         result = _select_assignees(SelectionPolicy.RANDOM, active, mock_state, 2)
 
-        # Для команды >= 2 человек выбираем 2
+        # For team >= 2 people select 2
         assert len(result) == 2
         assert all(user in active for user in result)
 
     def test_select_assignees_random_policy_small_team(self, mock_state):
-        """Тест выбора с политикой RANDOM для маленькой команды."""
-        active = ["@alice"]  # < 2 человек
+        """Test selection with RANDOM policy for small team."""
+        active = ["@alice"]  # < 2 people
 
         result = _select_assignees(SelectionPolicy.RANDOM, active, mock_state, 1)
 
-        # Для команды < 2 человек выбираем 1
+        # For team < 2 people select 1
         assert len(result) == 1
         assert result[0] in active
 
     def test_select_assignees_round_robin_policy(self, mock_state):
-        """Тест выбора с политикой ROUND_ROBIN."""
+        """Test selection with ROUND_ROBIN policy."""
         active = ["@alice", "@charlie", "@david"]
 
         result = _select_assignees(SelectionPolicy.ROUND_ROBIN, active, mock_state, 2)
 
-        # Round-robin для команды >= 2 выбирает 2 человек
+        # Round-robin for team >= 2 selects 2 people
         assert len(result) == 2
         assert all(user in active for user in result)
         assert mock_state.selector.policy == SelectionPolicy.ROUND_ROBIN
 
     def test_select_assignees_round_robin_sequence(self, mock_state):
-        """Тест последовательности round-robin выборов."""
+        """Test round-robin selection sequence."""
         active = ["@alice", "@bob", "@charlie"]
 
         results = []
-        for _ in range(3):  # 3 выбора
+        for _ in range(3):  # 3 selections
             result = _select_assignees(
                 SelectionPolicy.ROUND_ROBIN, active, mock_state, 2
             )
             results.extend(result)
 
-        # Каждый выбор возвращает 2 участника, итого 6 результатов
+        # Each selection returns 2 participants, total 6 results
         assert len(results) == 6
-        # Проверяем, что используются все участники (не обязательно равномерно)
-        assert len(set(results)) == 3  # Все 3 пользователя должны быть выбраны
+        # Check that all participants are used (not necessarily evenly)
+        assert len(set(results)) == 3  # All 3 users should be selected
 
     def test_select_assignees_with_invalid_active_users(self, mock_state):
-        """Тест выбора с активными пользователями не из коллекции."""
-        # Активные пользователи содержат того, кого нет в state.usernames
+        """Test selection with active users not from collection."""
+        # Active users contain someone not in state.usernames
         active = ["@alice", "@unknown_user"]
 
-        # Функция должна обработать ошибку и отфильтровать валидных пользователей
+        # Function should handle error and filter valid users
         result = _select_assignees(SelectionPolicy.RANDOM, active, mock_state, 2)
 
-        # Должен выбрать только валидных пользователей (только @alice)
+        # Should select only valid users (only @alice)
         assert len(result) == 1
         assert result[0] == "@alice"
-        # Проверяем, что коллекция была переустановлена
+        # Check that collection was reset
         assert mock_state.selector.collection == mock_state.usernames
 
 
 class TestChatState:
-    """Тесты для управления состоянием чата."""
+    """Tests for chat state management."""
 
     def setup_method(self):
-        """Очистка состояния перед каждым тестом."""
+        """Clean state before each test."""
         CHAT_STATE.clear()
 
     def test_get_chat_state_new_chat(self):
-        """Тест получения состояния для нового чата."""
+        """Test getting state for new chat."""
         chat_id = 12345
 
         state = _get_chat_state(chat_id)
@@ -150,7 +150,7 @@ class TestChatState:
         assert chat_id in CHAT_STATE
 
     def test_get_chat_state_existing_chat(self):
-        """Тест получения состояния для существующего чата."""
+        """Test getting state for existing chat."""
         chat_id = 12345
         # Создаём состояние
         first_state = _get_chat_state(chat_id)
@@ -164,10 +164,10 @@ class TestChatState:
 
 
 class TestDefaultUsers:
-    """Тесты для работы с пользователями по умолчанию."""
+    """Tests for working with default users."""
 
     def test_default_usernames_constant(self):
-        """Тест константы с пользователями по умолчанию."""
+        """Test default users constant."""
         assert isinstance(DEFAULT_USERNAMES, list)
         assert len(DEFAULT_USERNAMES) > 0
         assert all(username.startswith("@") for username in DEFAULT_USERNAMES)
@@ -184,14 +184,14 @@ class TestDefaultUsers:
 
 
 class TestIntegrationFlows:
-    """Интеграционные тесты полных флоу."""
+    """Integration tests for full flows."""
 
     def setup_method(self):
-        """Очистка состояния перед каждым тестом."""
+        """Clean state before each test."""
         CHAT_STATE.clear()
 
     def test_full_assignment_flow_round_robin(self):
-        """Тест полного флоу назначения с round-robin."""
+        """Test full assignment flow with round-robin."""
         chat_id = 12345
 
         # 1. Получаем состояние чата (новый чат)
@@ -222,7 +222,7 @@ class TestIntegrationFlows:
         assert unique_assigned.issubset(set(active_users))
 
     def test_full_assignment_flow_random(self):
-        """Тест полного флоу назначения с random."""
+        """Test full assignment flow with random."""
         chat_id = 67890
 
         # 1. Получаем состояние чата
@@ -244,7 +244,7 @@ class TestIntegrationFlows:
         assert len(set(assigned)) == 2  # Без дубликатов
 
     def test_policy_switch_during_usage(self):
-        """Тест смены политики в процессе использования."""
+        """Test policy switching during usage."""
         chat_id = 111222
         state = _get_chat_state(chat_id)
 
@@ -268,14 +268,14 @@ class TestIntegrationFlows:
 
 
 class TestRealWorldScenarios:
-    """Тесты реальных сценариев использования."""
+    """Tests for real-world usage scenarios."""
 
     def setup_method(self):
-        """Очистка состояния перед каждым тестом."""
+        """Clean state before each test."""
         CHAT_STATE.clear()
 
     def test_weekly_duty_assignment(self):
-        """Тест сценария еженедельного назначения дежурного."""
+        """Test weekly duty assignment scenario."""
         chat_id = 999
         state = _get_chat_state(chat_id)
 
@@ -305,7 +305,7 @@ class TestRealWorldScenarios:
         )  # Минимум 3 разных пользователя за 10 недель
 
     def test_random_task_distribution(self):
-        """Тест случайного распределения задач."""
+        """Test random task distribution."""
         chat_id = 888
         state = _get_chat_state(chat_id)
 

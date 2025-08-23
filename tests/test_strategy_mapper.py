@@ -1,7 +1,7 @@
 """
-Тесты для StrategyMapper.
+Tests for StrategyMapper.
 
-Проверяет корректность маппинга политик на стратегии.
+Verifies correct mapping of policies to strategies.
 """
 
 import pytest
@@ -15,38 +15,38 @@ from assign_bot.selector import (
 
 
 class TestStrategyMapper:
-    """Тесты для класса StrategyMapper."""
+    """Tests for StrategyMapper class."""
 
     def test_create_random_strategy(self):
-        """Тест создания стратегии Random."""
+        """Test creating Random strategy."""
         strategy = StrategyMapper.create_strategy(SelectionPolicy.RANDOM)
 
         assert isinstance(strategy, RandomStrategy)
 
     def test_create_round_robin_strategy(self):
-        """Тест создания стратегии Round-Robin."""
+        """Test creating Round-Robin strategy."""
         strategy = StrategyMapper.create_strategy(SelectionPolicy.ROUND_ROBIN)
 
         assert isinstance(strategy, RoundRobinStrategy)
 
     def test_create_strategy_unsupported_policy(self):
-        """Тест создания стратегии для неподдерживаемой политики."""
-        # Создаём несуществующую политику для теста
+        """Test creating strategy for unsupported policy."""
+        # Create non-existent policy for test
         fake_policy = "unsupported_policy"
 
-        with pytest.raises(ValueError, match="Неподдерживаемая политика"):
+        with pytest.raises(ValueError, match="Unsupported policy"):
             StrategyMapper.create_strategy(fake_policy)  # type: ignore
 
     def test_get_strategy_kwargs_random(self):
-        """Тест получения kwargs для Random стратегии."""
+        """Test getting kwargs for Random strategy."""
         kwargs = StrategyMapper.get_strategy_kwargs(
             SelectionPolicy.RANDOM, full_collection=["a", "b", "c"]
         )
 
-        assert kwargs == {}  # Random не нуждается в дополнительных параметрах
+        assert kwargs == {}  # Random doesn't need additional parameters
 
     def test_get_strategy_kwargs_round_robin(self):
-        """Тест получения kwargs для Round-Robin стратегии."""
+        """Test getting kwargs for Round-Robin strategy."""
         full_collection = ["@alice", "@bob", "@charlie"]
         kwargs = StrategyMapper.get_strategy_kwargs(
             SelectionPolicy.ROUND_ROBIN, full_collection=full_collection
@@ -55,7 +55,7 @@ class TestStrategyMapper:
         assert kwargs == {"full_collection": full_collection}
 
     def test_get_strategy_kwargs_round_robin_no_collection(self):
-        """Тест получения kwargs для Round-Robin без коллекции."""
+        """Test getting kwargs for Round-Robin without collection."""
         kwargs = StrategyMapper.get_strategy_kwargs(
             SelectionPolicy.ROUND_ROBIN, full_collection=None
         )
@@ -63,34 +63,34 @@ class TestStrategyMapper:
         assert kwargs == {"full_collection": None}
 
     def test_strategy_creation_and_usage_integration(self):
-        """Интеграционный тест: создание стратегии и её использование."""
-        # Создаём стратегию через маппер
+        """Integration test: strategy creation and usage."""
+        # Create strategy through mapper
         strategy = StrategyMapper.create_strategy(SelectionPolicy.ROUND_ROBIN)
 
-        # Получаем параметры через маппер
+        # Get parameters through mapper
         full_collection = ["@user1", "@user2", "@user3"]
         kwargs = StrategyMapper.get_strategy_kwargs(
             SelectionPolicy.ROUND_ROBIN, full_collection=full_collection
         )
 
-        # Используем стратегию
-        available = ["@user1", "@user3"]  # user2 недоступен
+        # Use strategy
+        available = ["@user1", "@user3"]  # user2 unavailable
         selected = strategy.select(available, count=1, **kwargs)
 
         assert len(selected) == 1
         assert selected[0] in available
 
     def test_mapper_supports_all_policies(self):
-        """Тест что маппер поддерживает все определённые политики."""
-        # Получаем все политики из enum
+        """Test that mapper supports all defined policies."""
+        # Get all policies from enum
         all_policies = list(SelectionPolicy)
 
-        # Проверяем, что для каждой политики можно создать стратегию
+        # Check that strategy can be created for each policy
         for policy in all_policies:
             strategy = StrategyMapper.create_strategy(policy)
             assert strategy is not None
 
-            # Проверяем, что можно получить kwargs
+            # Check that kwargs can be obtained
             kwargs = StrategyMapper.get_strategy_kwargs(
                 policy, full_collection=["test"]
             )
@@ -98,14 +98,14 @@ class TestStrategyMapper:
 
 
 class TestStrategyMapperExtensibility:
-    """Тесты расширяемости StrategyMapper."""
+    """Tests for StrategyMapper extensibility."""
 
     def test_mapper_is_easily_extensible(self):
-        """Демонстрация того, как легко расширить маппер."""
-        # Этот тест показывает, как просто добавить новую стратегию
-        # Достаточно добавить запись в strategy_map и case в get_strategy_kwargs
+        """Demonstration of how easy it is to extend mapper."""
+        # This test shows how easy it is to add new strategy
+        # Just need to add entry in strategy_map and case in get_strategy_kwargs
 
-        # Проверяем текущее количество поддерживаемых политик
+        # Check current number of supported policies
         current_policies = list(SelectionPolicy)
         supported_policies = []
 
@@ -116,6 +116,6 @@ class TestStrategyMapperExtensibility:
             except ValueError:
                 pass
 
-        # Все определённые политики должны поддерживаться
+        # All defined policies should be supported
         assert len(supported_policies) == len(current_policies)
         assert set(supported_policies) == set(current_policies)
